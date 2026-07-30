@@ -55,7 +55,7 @@ Before using the skill in another environment, replace the configured spreadshee
 Invoke the skill explicitly:
 
 ```text
-$seo-geo-article-publisher 运行一次
+$seo-geo-article-publisher run once
 ```
 
 Use a dry run when you want research, generation, and validation without claiming rows, publishing, or updating the sheet:
