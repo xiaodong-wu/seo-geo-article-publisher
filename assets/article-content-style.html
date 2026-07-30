@@ -1,0 +1,183 @@
+<style data-article-style="responsive-v1">
+.article-content {
+  /* Example palette only: replace every color variable from theme-colors.json. */
+  --article-accent: #176B5B;
+  --article-accent-dark: #0F4F44;
+  --article-text: #263238;
+  --article-muted: #52646C;
+  --article-border: #DCE6E3;
+  --article-soft: #F4F8F7;
+  --article-surface: #FFFFFF;
+  --article-table-header: #176B5B;
+  --article-table-header-text: #FFFFFF;
+  --article-table-stripe: #F4F8F7;
+  --article-table-hover: #E8F2EF;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  color: var(--article-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.article-content,
+.article-content * {
+  box-sizing: border-box;
+}
+.article-content > :first-child {
+  margin-top: 0;
+}
+.article-content p {
+  margin: 0 0 1.15em;
+}
+.article-content h2 {
+  margin: 2.2em 0 0.85em;
+  padding-bottom: 0.45em;
+  color: var(--article-accent-dark);
+  font-size: 32px;
+  line-height: 1.35;
+  border-bottom: 2px solid var(--article-border);
+}
+.article-content h3 {
+  margin: 1.7em 0 0.65em;
+  color: var(--article-accent-dark);
+  font-size: 22px;
+  line-height: 1.4;
+}
+.article-content a {
+  color: var(--article-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+.article-content a:hover {
+  color: var(--article-accent-dark);
+}
+.article-content ul,
+.article-content ol {
+  margin: 0 0 1.3em;
+  padding-left: 1.35em;
+}
+.article-content li {
+  padding-left: 0.25em;
+}
+.article-content li + li {
+  margin-top: 0.45em;
+}
+.article-content .article-table-wrap {
+  width: 100%;
+  margin: 1.6em 0;
+  overflow-x: auto;
+  border: 1px solid var(--article-border);
+  border-radius: 12px;
+  background: var(--article-surface);
+  box-shadow: 0 8px 24px rgba(34, 60, 54, 0.08);
+  -webkit-overflow-scrolling: touch;
+}
+.article-content table {
+  width: 100%;
+  min-width: 640px;
+  margin: 0;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--article-surface);
+}
+.article-content th,
+.article-content td {
+  padding: 0.85em 1em;
+  text-align: left;
+  vertical-align: top;
+  border-right: 1px solid var(--article-border);
+  border-bottom: 1px solid var(--article-border);
+}
+.article-content th:last-child,
+.article-content td:last-child {
+  border-right: 0;
+}
+.article-content tbody tr:last-child td {
+  border-bottom: 0;
+}
+.article-content th {
+  color: var(--article-table-header-text);
+  background: var(--article-table-header);
+  font-weight: 700;
+  line-height: 1.45;
+}
+.article-content tbody tr:nth-child(even) {
+  background: var(--article-table-stripe);
+}
+.article-content tbody tr:hover {
+  background: var(--article-table-hover);
+}
+.article-content figure {
+  margin: 1.8em 0;
+  padding: 0;
+}
+.article-content figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(28, 45, 41, 0.12);
+}
+.article-content figcaption {
+  margin-top: 0.7em;
+  color: var(--article-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+}
+.article-content blockquote {
+  margin: 1.5em 0;
+  padding: 1em 1.15em;
+  border-left: 4px solid var(--article-accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--article-soft);
+}
+@media (max-width: 768px) {
+  .article-content {
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  .article-content h2 {
+    margin-top: 1.8em;
+  }
+  .article-content h3 {
+    margin-top: 1.45em;
+  }
+  .article-content .article-table-wrap {
+    margin: 1.3em 0;
+    border-radius: 9px;
+  }
+  .article-content table {
+    min-width: 560px;
+  }
+  .article-content th,
+  .article-content td {
+    padding: 0.72em 0.78em;
+  }
+  .article-content figure {
+    margin: 1.45em 0;
+  }
+}
+@media (max-width: 480px) {
+  .article-content {
+    font-size: 14px;
+  }
+  .article-content h2 {
+    font-size: 22px;
+  }
+  .article-content h3 {
+    font-size: 18px;
+  }
+  .article-content table {
+    min-width: 520px;
+  }
+}
+</style>

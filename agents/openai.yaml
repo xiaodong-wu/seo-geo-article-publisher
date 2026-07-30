@@ -1,0 +1,6 @@
+interface:
+  display_name: "SEO/GEO Article Publisher"
+  short_description: "Generate, validate, publish, and verify B2B SEO/GEO articles"
+  default_prompt: "Use $seo-geo-article-publisher to publish the next pending article for each configured site."
+policy:
+  allow_implicit_invocation: false
