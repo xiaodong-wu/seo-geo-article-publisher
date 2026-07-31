@@ -50,25 +50,39 @@ Treat only HTTP 200 with JSON `code: 0` as API success. Require `data.article_ur
 
 ## Live-page verification
 
-After API success, verify:
+Before publishing, identify the canonical same-site article listing page from the site's primary
+navigation or article archive. Require HTTPS, the same host as the article, HTTP 200, and evidence
+that it lists recent articles. Record this URL as `article_listing_url`; do not use a generic
+homepage unless it is the site's actual article listing.
+
+After API success, verify the article detail page:
 
 - HTTP 200
 - the exact page title appears in rendered page text
-- every returned content-image path appears in the page HTML
+- every returned content-image path appears in the detail-page HTML
 - every returned content image uses a `.webp` path
 - the `responsive-v1` article style marker and `.article-content` wrapper appear in page HTML
 - every color variable recorded in the row's `theme-colors.json` appears with the same value in the
   published article CSS
 - no `<nav class="article-toc">` or unreplaced `[IMAGE_BASE64]` remains
 
-Check immediately. If verification fails, wait 30 seconds and check once more. Do not submit the
+Verify the returned thumbnail separately:
+
+- resolve the returned thumbnail path against the article host
+- require the thumbnail asset to return HTTP 200 with non-empty content
+- require the thumbnail path to use `.webp`
+- require `article_listing_url` to return HTTP 200 and contain the returned thumbnail path
+
+Do not require the thumbnail path to appear on the article detail page. Treat the detail-page,
+thumbnail-asset, and listing-page checks as one complete verification attempt. Check immediately.
+If any part fails, wait 30 seconds and repeat the complete verification once. Do not submit the
 article again while waiting or after the second failure.
 
 ## Sheet result states
 
 - **Verified:** write `已发布`, current Asia/Shanghai time, and the public article URL.
-- **API succeeded but both checks failed:** write `待人工检查`, current time, and the returned
-  article URL.
+- **API succeeded but both complete verification attempts failed:** write `待人工检查`, current
+  time, and the returned article URL.
 - **Failure before API success:** write `失败:<concise reason>`. Leave publication time and new
   article URL blank unless the API returned an article URL.
 

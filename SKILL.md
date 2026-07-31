@@ -43,6 +43,11 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 3. **Research the site**
    - Start from the related product URL and the tab domain. Inspect relevant product/category,
      service, factory/about, application, contact, and sitemap pages as available.
+   - Identify the canonical same-site article listing page from the site's primary navigation or
+     article archive. Require HTTPS, the same host as the site tab, HTTP 200, and evidence that the
+     page lists recent articles. Save it as `article_listing_url` in the row manifest for
+     post-publish thumbnail verification; do not substitute a generic homepage unless it is the
+     site's actual article listing.
    - Inspect the rendered homepage and related product page for the current site's visual theme.
      Capture same-site evidence for the primary accent and normal body-text color from computed CSS,
      a loaded same-site stylesheet, or—in the absence of a usable UI accent—the site's logo. Do not
@@ -232,11 +237,17 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
    - Run `scripts/publish_article.py`; enter the row's publishing key through its hidden prompt or a
      pre-existing environment variable. Never put the key in a command argument.
    - Upload `thumb` plus ordered `content_img[]` WebP files and matching `content_img_alt[]` values.
-   - After API success, run `scripts/verify_article.py` with the returned article URL and uploaded
-     image paths plus `theme-colors.json`. The script checks the title, WebP paths, responsive style
-     marker, complete site-theme palette, `.article-content` wrapper, absence of the old TOC, and
-     placeholder replacement immediately; it waits 30 seconds once and then checks again when
-     needed.
+   - After API success, run `scripts/verify_article.py` with the returned article URL, recorded
+     `article_listing_url`, returned thumbnail path, returned content-image paths, and
+     `theme-colors.json`.
+   - Check the exact title, every returned content-image path, responsive style marker, complete
+     site-theme palette, `.article-content` wrapper, absence of the old TOC, and placeholder
+     replacement on the article detail page. Do not require the thumbnail path on the detail page.
+   - Check the returned thumbnail separately: require its same-site `.webp` path to return HTTP 200
+     with non-empty content, and require the path to appear on the recorded article listing page.
+     Treat the complete detail-page, thumbnail-asset, and listing-page result as one verification
+     attempt. Check immediately, wait 30 seconds once when needed, and then check the complete
+     result again.
    - Update the Sheet exactly as specified in `references/publishing.md`.
 
 7. **Continue and report**
@@ -249,8 +260,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 
 - Before API success, write `失败:<concise reason>` for a claimed live row.
 - After API success, never publish the same job again speculatively.
-- If both public-page checks fail, write `待人工检查`, retain the publish time and returned article
-  URL, and continue to the next tab.
+- If both complete public verification attempts fail, write `待人工检查`, retain the publish time
+  and returned article URL, and continue to the next tab.
 - Write `已发布` only after the public page passes verification.
 - Do not automatically clear `失败` or `待人工检查`; require an explicit user decision before retrying.
 
@@ -272,8 +283,9 @@ python scripts/validate_article.py --title-file FILE --seo-title-file FILE \
 python scripts/publish_article.py --endpoint URL --title-file FILE --seo-title-file FILE \
   --remark-file FILE --seo-desc-file FILE --content-file FILE --thumb FILE \
   --content-image FILE --content-image-alt TEXT [--content-image FILE ...] [--dry-run]
-python scripts/verify_article.py --url URL --title-file FILE --theme-colors-file FILE \
-  --image-path PATH [--image-path PATH ...] --retry-delay 30
+python scripts/verify_article.py --url ARTICLE_URL --listing-url LISTING_URL \
+  --title-file FILE --theme-colors-file FILE --thumbnail-path THUMB_PATH \
+  --content-image-path BODY_PATH [--content-image-path BODY_PATH ...] --retry-delay 30
 ```
 
 Use paths relative to this skill directory for scripts. Keep generated runs outside the skill.

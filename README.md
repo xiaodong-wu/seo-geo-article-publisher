@@ -14,7 +14,8 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 - Requires different source images and article roles unless only one valid product source exists.
 - Locks original branding, labels, packaging colors, and product geometry during whole-image regeneration.
 - Validates content structure, length, FAQ count, links, theme contrast, image diversity, and product-identity evidence.
-- Publishes through a multipart WUZHICMS endpoint and verifies the resulting public page.
+- Publishes through a multipart WUZHICMS endpoint, checks body images on the article detail page,
+  and verifies the thumbnail asset plus its appearance on the article listing page.
 - Keeps publishing keys out of files, command arguments, logs, and reports.
 
 ## Repository Layout
@@ -28,13 +29,15 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 │   ├── api-contract.md
 │   ├── content-spec.md
 │   └── publishing.md
-└── scripts/
+├── scripts/
     ├── analyze_image_pool.py
     ├── optimize_image.py
     ├── prepare_locked_product.py
     ├── publish_article.py
     ├── validate_article.py
     └── verify_article.py
+└── tests/
+    └── test_verify_article.py
 ```
 
 ## Installation
@@ -74,6 +77,7 @@ The repository's Python helpers can be syntax-checked with:
 
 ```bash
 python3 -m py_compile scripts/*.py
+python3 -m unittest discover -s tests
 ```
 
 `validate_article.py` is the final local gate and should pass before any publishing API call.
