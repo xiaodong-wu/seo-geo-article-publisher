@@ -20,6 +20,14 @@ RELATED_KEYWORDS = [
 ]
 
 
+def visible_text_with_word_count(blocks: list[str], total_words: int) -> str:
+    text = " ".join(blocks)
+    current_words = len(validate_article.WORD_RE.findall(text))
+    if current_words > total_words:
+        raise ValueError("Requested word count is shorter than the supplied blocks")
+    return f"{text} {'context ' * (total_words - current_words)}".strip()
+
+
 class KeywordUsageTests(unittest.TestCase):
     def test_exact_phrase_count_uses_word_boundaries(self) -> None:
         text = (
@@ -41,18 +49,30 @@ class KeywordUsageTests(unittest.TestCase):
             f"Qualified {CORE_KEYWORD} identify every proposed deviation.",
         ]
 
-        result = validate_article.validate_keyword_usage(
+        metrics, errors = validate_article.validate_keyword_usage(
             blocks,
+            visible_text_with_word_count(blocks, 1000),
             CORE_KEYWORD,
             RELATED_KEYWORDS,
         )
 
-        self.assertEqual(result[0], 3)
-        self.assertEqual(result[1], 3)
-        self.assertEqual(result[2]["receipt roll quality control"], 2)
-        self.assertEqual(result[2]["thermal media storage"], 1)
-        self.assertEqual(result[3], 3)
-        self.assertEqual(result[5], [])
+        self.assertEqual(metrics["core_keyword_occurrences"], 3)
+        self.assertEqual(metrics["core_keyword_blocks"], 3)
+        self.assertEqual(metrics["core_keyword_weighted_words"], 12)
+        self.assertEqual(
+            metrics["related_keyword_occurrences"]["receipt roll quality control"],
+            2,
+        )
+        self.assertEqual(
+            metrics["related_keyword_occurrences"]["thermal media storage"],
+            1,
+        )
+        self.assertEqual(metrics["related_keyword_occurrences_total"], 3)
+        self.assertEqual(metrics["related_keyword_weighted_words"], 11)
+        self.assertEqual(metrics["visible_word_count"], 1000)
+        self.assertEqual(metrics["keyword_weighted_words"], 23)
+        self.assertEqual(metrics["keyword_density_percent"], 2.3)
+        self.assertEqual(errors, [])
 
     def test_core_keyword_repetition_in_one_block_fails(self) -> None:
         blocks = [
@@ -62,11 +82,12 @@ class KeywordUsageTests(unittest.TestCase):
             "Receipt roll quality control should be recorded.",
         ]
 
-        errors = validate_article.validate_keyword_usage(
+        _, errors = validate_article.validate_keyword_usage(
             blocks,
+            visible_text_with_word_count(blocks, 1000),
             CORE_KEYWORD,
             RELATED_KEYWORDS,
-        )[5]
+        )
 
         self.assertTrue(
             any("must not appear more than once" in error for error in errors)
@@ -75,26 +96,62 @@ class KeywordUsageTests(unittest.TestCase):
             any("at least two later content blocks" in error for error in errors)
         )
 
-    def test_related_keyword_overuse_fails(self) -> None:
+    def test_missing_related_keyword_fails(self) -> None:
         blocks = [
             f"{CORE_KEYWORD} define receipt roll quality control.",
             f"Qualified {CORE_KEYWORD} audit receipt roll quality control.",
-            f"Compare {CORE_KEYWORD} through receipt roll quality control.",
-            "Thermal media storage protects finished rolls.",
+            f"Compare {CORE_KEYWORD} through documented acceptance criteria.",
         ]
 
-        errors = validate_article.validate_keyword_usage(
+        _, errors = validate_article.validate_keyword_usage(
             blocks,
+            visible_text_with_word_count(blocks, 1000),
             CORE_KEYWORD,
             RELATED_KEYWORDS,
-        )[5]
+        )
 
         self.assertTrue(
             any(
-                '"receipt roll quality control" must appear 1–2 times' in error
+                '"thermal media storage" must appear at least once' in error
                 for error in errors
             )
         )
+
+    def test_keyword_density_below_one_percent_fails(self) -> None:
+        blocks = [
+            f"{CORE_KEYWORD} connect printer limits with receipt roll quality control.",
+            f"A second review by {CORE_KEYWORD} should define thermal media storage.",
+            "Document receipt roll quality control before repeat production.",
+            f"Qualified {CORE_KEYWORD} identify every proposed deviation.",
+        ]
+
+        metrics, errors = validate_article.validate_keyword_usage(
+            blocks,
+            visible_text_with_word_count(blocks, 3000),
+            CORE_KEYWORD,
+            RELATED_KEYWORDS,
+        )
+
+        self.assertLess(metrics["keyword_density_percent"], 1.0)
+        self.assertTrue(any("must be 1.00%–3.00%" in error for error in errors))
+
+    def test_keyword_density_above_three_percent_fails(self) -> None:
+        blocks = [
+            f"{CORE_KEYWORD} connect printer limits with receipt roll quality control.",
+            f"A second review by {CORE_KEYWORD} should define thermal media storage.",
+            "Document receipt roll quality control before repeat production.",
+            f"Qualified {CORE_KEYWORD} identify every proposed deviation.",
+        ]
+
+        metrics, errors = validate_article.validate_keyword_usage(
+            blocks,
+            visible_text_with_word_count(blocks, 500),
+            CORE_KEYWORD,
+            RELATED_KEYWORDS,
+        )
+
+        self.assertGreater(metrics["keyword_density_percent"], 3.0)
+        self.assertTrue(any("must be 1.00%–3.00%" in error for error in errors))
 
     def test_related_keywords_cannot_overlap_core_or_each_other(self) -> None:
         related, errors = validate_article.validate_related_keywords(

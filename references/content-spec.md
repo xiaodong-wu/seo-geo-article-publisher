@@ -462,17 +462,27 @@ photograph, or competitor site.
 
 - Place the core keyword naturally near the beginning of the lead.
 - Link the first occurrence of the core keyword to a real, relevant page on the same site.
-- Use the exact core keyword 3–5 times in visible `content.html` copy. The linked lead occurrence
-  counts as the first use. Distribute the phrase across the lead and at least two later content
-  blocks; never use it more than once in the same paragraph, heading, list item, table cell, or
+- Keep the combined exact target-keyword density between 1.00% and 3.00% of the article's visible
+  English words. Use this formula:
+
+  `density = weighted exact keyword words / all visible article words × 100`
+
+  Calculate weighted exact keyword words by multiplying each exact phrase's occurrence count by
+  the number of English words in that phrase, then summing the core keyword and every selected
+  related keyword. For example, a four-word phrase used three times contributes 12 keyword words.
+- The linked lead occurrence counts as the first core-keyword use. Distribute the core phrase
+  across the lead and at least two later content blocks. Use every selected related keyword at
+  least once and distribute related-keyword uses across at least two content blocks. Never use the
+  same exact phrase more than once in the same paragraph, heading, list item, table cell, or
   caption. A heading occurrence is optional and must not be a mechanical prefix.
-- Use every selected related keyword 1–2 times. Keep all selected related keywords at 3–5 visible
-  occurrences in total and distribute them across at least two content blocks. Prefer a useful
-  technical, comparison, application, or purchasing sentence over a standalone keyword sentence.
-- Count only reader-visible text inside `.article-content`: headings, paragraphs, list items,
-  table cells, and captions. Do not count or manipulate `title`, `seo_title1`, `remark`, `seo_desc`,
-  CSS, HTML attributes, anchor URLs, image alt text, hidden text, or page chrome. Do not use a
-  plural/singular rewrite as an exact occurrence unless it exactly matches the recorded phrase.
+- Count all reader-visible English words inside `.article-content`: headings, paragraphs, list
+  items, table cells, captions, FAQ content, and any visible CTA. Do not count or manipulate
+  `title`, `seo_title1`, `remark`, `seo_desc`, CSS, HTML attributes, anchor URLs, image alt text,
+  hidden text, or page chrome. Count only exact recorded phrases; a plural/singular rewrite does
+  not count unless it exactly matches the recorded phrase.
+- Prefer a useful technical, comparison, application, or purchasing sentence over a standalone
+  keyword sentence. Check density after drafting and revise existing relevant passages rather than
+  adding unrelated sections or clustering repetitions merely to reach the range.
 - Use only verified same-site HTTPS links. Never invent a URL or substitute a competitor.
 - Add one or two relevant internal links per 2,000 visible English characters: normally 5–10 links
   for a 10,000-character article and 8–15 for a 15,000-character article.
@@ -485,7 +495,7 @@ photograph, or competitor site.
   tables, FAQ, and any CTA that is present.
 - Exclude HTML tags, anchors, image paths, SEO fields, and page chrome from the count.
 - Prefer independently understandable answers, complete product/material names, explicit
-  comparison conditions, and consistent facts. Meet keyword counts through relevant statements;
+  comparison conditions, and consistent facts. Meet keyword density through relevant statements;
   do not pad, cluster, or mechanically repeat phrases.
 
 ## Images
@@ -824,6 +834,6 @@ title angle-pattern pair, a valid seeded 70/30 title mode, one naturally integra
 neutral title and article wording, sufficient title diversity, one primary intent from the
 seven-type taxonomy, no more than one subordinate secondary intent, a compatible buyer stage,
 current documented research, a varied evidence-led outline, 10,000–15,000 visible characters with
-a 12,000–13,500 target, 3–5 distributed exact core-keyword occurrences, 2–4 distinct related
-keywords with 3–5 combined distributed occurrences, a buyer-stage-appropriate non-boilerplate
-ending, and no unsupported claims.
+a 12,000–13,500 target, 2–4 distinct related keywords, a 1.00%–3.00% combined exact
+core-and-related-keyword density with natural block-level distribution, a buyer-stage-appropriate
+non-boilerplate ending, and no unsupported claims.

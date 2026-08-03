@@ -154,14 +154,17 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      toward this requirement. Give every non-FAQ H3 at least 180 visible characters of substantive
      explanation before the next heading, and distribute H3s across multiple H2 sections instead of
      mechanically splitting one section or repeating generic labels.
-   - Use the exact core keyword 3–5 times in the visible `content.html` article copy. Count the
-     linked lead occurrence, then distribute the remaining occurrences across at least two later
-     paragraphs, headings, list items, table cells, or captions. Never repeat it twice in one
-     content block, and do not force every occurrence into headings.
-   - Use every selected `related_keyword` 1–2 times and keep their combined visible occurrences at
-     3–5 across at least two content blocks. Count only visible article copy, not `title`, SEO
-     fields, CSS, HTML attributes, image alt text, hidden text, or page chrome. Rewrite the sentence
-     when an exact phrase sounds forced; never add an unrelated section merely to satisfy a count.
+   - Keep the combined exact target-keyword density between 1.00% and 3.00% of all reader-visible
+     English words in `content.html`. Calculate density as the weighted word count of the exact core
+     keyword plus every selected `related_keyword`, divided by the total visible word count. For
+     example, a four-word phrase used three times contributes 12 keyword words. Do not count
+     `title`, SEO fields, CSS, HTML attributes, image alt text, hidden text, or page chrome.
+   - Count the linked lead occurrence of the core keyword, then distribute the phrase across the
+     lead and at least two later paragraphs, headings, list items, table cells, or captions. Use
+     every selected related keyword at least once and distribute related-keyword uses across at
+     least two content blocks. Never repeat the same exact phrase twice in one content block or
+     force every occurrence into headings. Rewrite a sentence when a phrase sounds forced; never
+     add an unrelated section merely to reach the density range.
    - Do not generate a table of contents or `<nav class="article-toc">`. Start `content.html` with
      the scoped style block from `assets/article-content-style.html`, then wrap the article in
      `<article class="article-content">`.
@@ -269,8 +272,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      CTA, and repeated CTA boilerplate.
    - Require the validator to confirm one primary intent from the seven-type taxonomy, no more than
      one subordinate secondary intent, a compatible buyer stage, neutral editorial stance,
-     documented query signals, related searches, 2–4 non-overlapping related keywords, exact
-     core-keyword use 3–5 times, related-keyword use 3–5 times in total, natural block-level
+     documented query signals, related searches, 2–4 non-overlapping related keywords, a combined
+     exact target-keyword density of 1.00%–3.00% of reader-visible words, natural block-level
      distribution, current source access dates, same-site evidence, and external research (or a
      concrete no-source reason).
    - Require length-adjusted non-FAQ H3 counts, coverage across multiple body H2 sections, unique

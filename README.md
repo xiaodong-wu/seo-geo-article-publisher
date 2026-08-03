@@ -15,8 +15,8 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 - Uses neutral third-person buyer guidance, including evidence-led treatment of manufacturer lists.
 - Adds length-adjusted, substantive H3 analysis across multiple non-FAQ H2 sections instead of
   limiting H3s to FAQ questions.
-- Requires the exact core keyword 3–5 times and 2–4 intent-aligned related keywords with 3–5
-  combined occurrences, distributed naturally across the visible article content.
+- Requires a 1.00%–3.00% combined exact core-and-related-keyword density, calculated from weighted
+  phrase words and distributed naturally across the visible article content.
 - Prevents target-country and target-customer fields from becoming repetitive title templates.
 - Matches article typography and table colors to each site's observed theme.
 - Builds and deduplicates a same-site image candidate pool before assigning image slots.

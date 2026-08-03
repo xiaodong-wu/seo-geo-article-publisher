@@ -31,10 +31,8 @@ ARTICLE_MIN_VISIBLE_CHARACTERS = 10000
 ARTICLE_PREFERRED_MIN_VISIBLE_CHARACTERS = 12000
 ARTICLE_PREFERRED_MAX_VISIBLE_CHARACTERS = 13500
 ARTICLE_MAX_VISIBLE_CHARACTERS = 15000
-CORE_KEYWORD_MIN_OCCURRENCES = 3
-CORE_KEYWORD_MAX_OCCURRENCES = 5
-RELATED_KEYWORD_MIN_TOTAL_OCCURRENCES = 3
-RELATED_KEYWORD_MAX_TOTAL_OCCURRENCES = 5
+KEYWORD_DENSITY_MIN_PERCENT = 1.0
+KEYWORD_DENSITY_MAX_PERCENT = 3.0
 NON_FAQ_H3_MIN_CONTENT_CHARACTERS = 180
 NON_FAQ_H3_MAX_COUNT = 10
 FAQ_HEADING_TEXTS = {
@@ -718,9 +716,10 @@ def count_exact_phrase(text: str, phrase: str) -> int:
 
 def validate_keyword_usage(
     content_blocks: list[str],
+    visible_text: str,
     core_keyword: str,
     related_keywords: list[str],
-) -> tuple[int, int, dict[str, int], int, int, list[str]]:
+) -> tuple[dict[str, object], list[str]]:
     errors: list[str] = []
     core_block_counts = [
         count_exact_phrase(block, core_keyword) for block in content_blocks
@@ -728,11 +727,6 @@ def validate_keyword_usage(
     core_occurrences = sum(core_block_counts)
     core_blocks = sum(count > 0 for count in core_block_counts)
 
-    if not CORE_KEYWORD_MIN_OCCURRENCES <= core_occurrences <= CORE_KEYWORD_MAX_OCCURRENCES:
-        errors.append(
-            "Exact core keyword must appear 3–5 times in visible content; "
-            f"received {core_occurrences}"
-        )
     if core_blocks < 3:
         errors.append(
             "Exact core keyword must be distributed across the lead and at least "
@@ -757,9 +751,9 @@ def validate_keyword_usage(
             related_block_indexes.update(
                 index for index, block_count in enumerate(block_counts) if block_count
             )
-            if not 1 <= count <= 2:
+            if count < 1:
                 errors.append(
-                    f'Related keyword "{related_keyword}" must appear 1–2 times '
+                    f'Related keyword "{related_keyword}" must appear at least once '
                     f"in visible content; received {count}"
                 )
             if any(block_count > 1 for block_count in block_counts):
@@ -769,15 +763,6 @@ def validate_keyword_usage(
                 )
 
         related_total = sum(related_counts.values())
-        if not (
-            RELATED_KEYWORD_MIN_TOTAL_OCCURRENCES
-            <= related_total
-            <= RELATED_KEYWORD_MAX_TOTAL_OCCURRENCES
-        ):
-            errors.append(
-                "Selected related keywords must appear 3–5 times in total in "
-                f"visible content; received {related_total}"
-            )
         if len(related_block_indexes) < 2:
             errors.append(
                 "Related keywords must be distributed across at least two content "
@@ -786,14 +771,49 @@ def validate_keyword_usage(
     else:
         related_total = 0
 
-    return (
-        core_occurrences,
-        core_blocks,
-        related_counts,
-        related_total,
-        len(related_block_indexes),
-        errors,
+    visible_word_count = len(WORD_RE.findall(visible_text))
+    core_keyword_words = len(WORD_RE.findall(core_keyword))
+    core_keyword_weighted_words = core_occurrences * core_keyword_words
+    related_keyword_weighted_words = sum(
+        related_counts[related_keyword] * len(WORD_RE.findall(related_keyword))
+        for related_keyword in related_keywords
     )
+    keyword_weighted_words = (
+        core_keyword_weighted_words + related_keyword_weighted_words
+    )
+    keyword_density_percent = (
+        keyword_weighted_words / visible_word_count * 100
+        if visible_word_count
+        else 0.0
+    )
+    if not (
+        KEYWORD_DENSITY_MIN_PERCENT
+        <= keyword_density_percent
+        <= KEYWORD_DENSITY_MAX_PERCENT
+    ):
+        errors.append(
+            "Combined exact target-keyword density must be 1.00%–3.00% of "
+            "visible article words; received "
+            f"{keyword_density_percent:.2f}% "
+            f"({keyword_weighted_words} weighted keyword words / "
+            f"{visible_word_count} visible words)"
+        )
+
+    metrics: dict[str, object] = {
+        "core_keyword_occurrences": core_occurrences,
+        "core_keyword_blocks": core_blocks,
+        "core_keyword_weighted_words": core_keyword_weighted_words,
+        "related_keyword_occurrences": related_counts,
+        "related_keyword_occurrences_total": related_total,
+        "related_keyword_blocks": len(related_block_indexes),
+        "related_keyword_weighted_words": related_keyword_weighted_words,
+        "visible_word_count": visible_word_count,
+        "keyword_weighted_words": keyword_weighted_words,
+        "keyword_density_percent": round(keyword_density_percent, 4),
+        "keyword_density_min_percent": KEYWORD_DENSITY_MIN_PERCENT,
+        "keyword_density_max_percent": KEYWORD_DENSITY_MAX_PERCENT,
+    }
+    return metrics, errors
 
 
 def validate_non_faq_h3_depth(
@@ -3253,15 +3273,9 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
             f"received {args.content_images}"
         )
 
-    (
-        core_keyword_occurrences,
-        core_keyword_blocks,
-        related_keyword_occurrences,
-        related_keyword_occurrences_total,
-        related_keyword_blocks,
-        keyword_usage_errors,
-    ) = validate_keyword_usage(
+    keyword_metrics, keyword_usage_errors = validate_keyword_usage(
         parser.content_blocks,
+        visible,
         keyword,
         related_keywords,
     )
@@ -3343,12 +3357,8 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
             "research_sources": research_source_count,
             "same_site_research_sources": same_site_research_sources,
             "external_research_sources": external_research_sources,
-            "core_keyword_occurrences": core_keyword_occurrences,
-            "core_keyword_blocks": core_keyword_blocks,
             "related_keywords": related_keywords,
-            "related_keyword_occurrences": related_keyword_occurrences,
-            "related_keyword_occurrences_total": related_keyword_occurrences_total,
-            "related_keyword_blocks": related_keyword_blocks,
+            **keyword_metrics,
             "seo_description_characters": len(seo_desc),
             "visible_characters": visible_characters,
             "visible_characters_preferred_range": (
