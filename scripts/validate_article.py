@@ -26,6 +26,31 @@ WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’/-]*")
 SPACE_RE = re.compile(r"\s+")
 PLACEHOLDER = "[IMAGE_BASE64]"
 STYLE_VERSION = "responsive-v1"
+QUESTION_TITLE_PROBABILITY = 70
+ARTICLE_MIN_VISIBLE_CHARACTERS = 10000
+ARTICLE_PREFERRED_MIN_VISIBLE_CHARACTERS = 12000
+ARTICLE_PREFERRED_MAX_VISIBLE_CHARACTERS = 13500
+ARTICLE_MAX_VISIBLE_CHARACTERS = 15000
+CORE_KEYWORD_MIN_OCCURRENCES = 3
+CORE_KEYWORD_MAX_OCCURRENCES = 5
+RELATED_KEYWORD_MIN_TOTAL_OCCURRENCES = 3
+RELATED_KEYWORD_MAX_TOTAL_OCCURRENCES = 5
+NON_FAQ_H3_MIN_CONTENT_CHARACTERS = 180
+NON_FAQ_H3_MAX_COUNT = 10
+FAQ_HEADING_TEXTS = {
+    "faq",
+    "faqs",
+    "frequently asked questions",
+}
+ARTICLE_KEYWORD_BLOCK_TAGS = {
+    "p",
+    "h2",
+    "h3",
+    "li",
+    "th",
+    "td",
+    "figcaption",
+}
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 THEME_COLOR_VARIABLES = (
     "--article-accent",
@@ -137,24 +162,43 @@ TITLE_PATTERNS = {
     "risk-led",
     "benefit-led",
 }
+QUESTION_TITLE_PATTERNS = TITLE_PATTERNS - {"direct-statement"}
+STATEMENT_TITLE_PATTERNS = TITLE_PATTERNS - {"question"}
 SEARCH_INTENTS = {
-    "product-education",
-    "feature-application",
-    "comparison",
-    "supplier-manufacturer-discovery",
+    "foundational-knowledge",
+    "product-selection",
+    "product-comparison",
     "oem-odm",
-    "specifications",
+    "supplier-evaluation",
+    "application-scenario",
     "problem-solving",
-    "purchasing-advice",
-    "quotation-customization",
 }
-COMMERCIAL_SEARCH_INTENTS = {
-    "supplier-manufacturer-discovery",
+BUYER_STAGES = {
+    "awareness",
+    "consideration",
+    "evaluation",
+    "inquiry",
+}
+BUYER_STAGE_ENDING_MODES = {
+    "awareness": {"informational-close"},
+    "consideration": {"informational-close", "inline-cta"},
+    "evaluation": {"informational-close", "inline-cta"},
+    "inquiry": {"inline-cta", "standalone-cta"},
+}
+SEARCH_INTENT_BUYER_STAGES = {
+    "foundational-knowledge": {"awareness", "consideration"},
+    "product-selection": {"consideration", "evaluation", "inquiry"},
+    "product-comparison": {"consideration", "evaluation"},
+    "oem-odm": {"consideration", "evaluation", "inquiry"},
+    "supplier-evaluation": {"consideration", "evaluation", "inquiry"},
+    "application-scenario": {"awareness", "consideration", "evaluation"},
+    "problem-solving": {"awareness", "consideration", "evaluation", "inquiry"},
+}
+STANDALONE_CTA_SEARCH_INTENTS = {
+    "product-selection",
     "oem-odm",
-    "purchasing-advice",
-    "quotation-customization",
+    "supplier-evaluation",
 }
-INFORMATIONAL_SEARCH_INTENTS = SEARCH_INTENTS - COMMERCIAL_SEARCH_INTENTS
 ENDING_MODES = {
     "informational-close",
     "inline-cta",
@@ -178,6 +222,12 @@ CTA_BOILERPLATE_PHRASES = (
 GENERIC_CTA_HEADING_RE = re.compile(
     r"^(?:(?:build|request|prepare|get|start)\b.*\b"
     r"(?:rfq|proposal|quote|quotation)|contact us|get a quote|request a quote)$",
+    flags=re.IGNORECASE,
+)
+EARLY_CONVERSION_RE = re.compile(
+    r"\b(?:request|submit|get|ask\s+for|contact)\b"
+    r"(?:\s+[A-Za-z0-9'’/-]+){0,8}\s+"
+    r"(?:quote|quotation|rfq|sample|customization|custom\s+request)\b",
     flags=re.IGNORECASE,
 )
 TITLE_SIMILARITY_STOPWORDS = {
@@ -381,6 +431,72 @@ def title_content_tokens(signature: str) -> set[str]:
     }
 
 
+def stable_percentage_roll(seed: str) -> int:
+    normalized_seed = normalize_space(seed)
+    if not normalized_seed:
+        raise ValueError("Title-mode seed cannot be empty")
+    upper_bound = 1 << 64
+    acceptance_limit = upper_bound - (upper_bound % 100)
+    counter = 0
+    while True:
+        payload = f"{normalized_seed}\x1f{counter}".encode("utf-8")
+        value = int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
+        if value < acceptance_limit:
+            return value % 100
+        counter += 1
+
+
+def validate_title_mode(
+    title: str,
+    keyword: str,
+    title_mode_seed: str,
+) -> tuple[int, str, bool, list[str]]:
+    errors: list[str] = []
+    try:
+        roll = stable_percentage_roll(title_mode_seed)
+    except ValueError as exc:
+        return -1, "invalid", False, [str(exc)]
+
+    expected_mode = (
+        "question" if roll < QUESTION_TITLE_PROBABILITY else "statement"
+    )
+    stripped_title = title.rstrip()
+    is_question = stripped_title.endswith("?") and stripped_title.count("?") == 1
+    if expected_mode == "question" and not is_question:
+        errors.append(
+            f"Title-mode roll {roll} requires a question title ending with one question mark"
+        )
+    if expected_mode == "statement" and "?" in stripped_title:
+        errors.append(
+            f"Title-mode roll {roll} requires a non-question title without a question mark"
+        )
+
+    if keyword:
+        direct_prefix = re.compile(
+            rf"^\s*{re.escape(keyword)}\s*[:|\-\u2013\u2014]",
+            flags=re.IGNORECASE,
+        )
+        if direct_prefix.search(title):
+            errors.append(
+                "Title must integrate the core keyword into the sentence instead of "
+                "using the keyword as a colon or dash prefix"
+            )
+        keyword_occurrences = count_exact_phrase(title, keyword)
+        if keyword_occurrences != 1:
+            errors.append(
+                "Title must contain the exact core keyword once as a natural phrase; "
+                f"received {keyword_occurrences} occurrences"
+            )
+        supporting_tokens = title_content_tokens(title_signature(title, keyword))
+        if len(supporting_tokens) < 3:
+            errors.append(
+                "Title must add at least three meaningful content words around the "
+                "core keyword"
+            )
+
+    return roll, expected_mode, is_question, errors
+
+
 def read_title_history(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     errors: list[str] = []
     try:
@@ -422,6 +538,7 @@ def validate_title_diversity(
     keyword: str,
     angle: str,
     pattern: str,
+    title_mode: str,
     history_path: Path,
 ) -> tuple[int, float, list[str]]:
     history, errors = read_title_history(history_path)
@@ -429,6 +546,15 @@ def validate_title_diversity(
         errors.append(f"Invalid title angle: {angle}")
     if pattern not in TITLE_PATTERNS:
         errors.append(f"Invalid title pattern: {pattern}")
+    compatible_patterns = (
+        QUESTION_TITLE_PATTERNS
+        if title_mode == "question"
+        else STATEMENT_TITLE_PATTERNS
+    )
+    if pattern in TITLE_PATTERNS and pattern not in compatible_patterns:
+        errors.append(
+            f"Title pattern {pattern} is incompatible with title mode {title_mode}"
+        )
 
     current_normalized = normalize_title_match(title)
     current_signature = title_signature(title, keyword)
@@ -451,9 +577,9 @@ def validate_title_diversity(
             errors.append(
                 f"Title angle is not among the least-used choices for this run: {angle}"
             )
-    if pattern in TITLE_PATTERNS:
+    if pattern in compatible_patterns:
         least_pattern_count = min(
-            pattern_counts.get(item, 0) for item in TITLE_PATTERNS
+            pattern_counts.get(item, 0) for item in compatible_patterns
         )
         if pattern_counts.get(pattern, 0) > least_pattern_count:
             errors.append(
@@ -524,6 +650,242 @@ def nonempty_string_list(value: object) -> list[str] | None:
     return normalized
 
 
+def validate_related_keywords(
+    value: object,
+    core_keyword: str,
+) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    related_keywords = nonempty_string_list(value)
+    if related_keywords is None or not 2 <= len(related_keywords) <= 4:
+        received = len(related_keywords) if related_keywords is not None else 0
+        return [], [
+            "intent-analysis must contain 2–4 non-empty related_keywords; "
+            f"received {received}"
+        ]
+
+    normalized = [normalize_title_match(item) for item in related_keywords]
+    if len(set(normalized)) != len(normalized):
+        errors.append("intent-analysis related_keywords must be distinct")
+
+    core_normalized = normalize_title_match(core_keyword)
+    for index, (keyword, keyword_normalized) in enumerate(
+        zip(related_keywords, normalized)
+    ):
+        word_count = len(WORD_RE.findall(keyword))
+        if not 2 <= word_count <= 8 or len(keyword) > 80:
+            errors.append(
+                f"intent-analysis related_keywords[{index}] must contain "
+                "2–8 English words and at most 80 characters"
+            )
+        if (
+            not keyword_normalized
+            or contains_normalized_phrase(core_normalized, keyword_normalized)
+            or contains_normalized_phrase(keyword_normalized, core_normalized)
+        ):
+            errors.append(
+                f"intent-analysis related_keywords[{index}] must not equal, "
+                "contain, or be contained by the core keyword"
+            )
+
+    for first_index, first in enumerate(normalized):
+        for second_index, second in enumerate(
+            normalized[first_index + 1 :],
+            start=first_index + 1,
+        ):
+            if (
+                contains_normalized_phrase(first, second)
+                or contains_normalized_phrase(second, first)
+            ):
+                errors.append(
+                    "intent-analysis related keywords must not contain one another: "
+                    f"indexes {first_index} and {second_index}"
+                )
+
+    return related_keywords, errors
+
+
+def count_exact_phrase(text: str, phrase: str) -> int:
+    normalized_text = normalize_space(text)
+    normalized_phrase = normalize_space(phrase)
+    if not normalized_text or not normalized_phrase:
+        return 0
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9]){re.escape(normalized_phrase)}(?![A-Za-z0-9])",
+        flags=re.IGNORECASE,
+    )
+    return len(pattern.findall(normalized_text))
+
+
+def validate_keyword_usage(
+    content_blocks: list[str],
+    core_keyword: str,
+    related_keywords: list[str],
+) -> tuple[int, int, dict[str, int], int, int, list[str]]:
+    errors: list[str] = []
+    core_block_counts = [
+        count_exact_phrase(block, core_keyword) for block in content_blocks
+    ]
+    core_occurrences = sum(core_block_counts)
+    core_blocks = sum(count > 0 for count in core_block_counts)
+
+    if not CORE_KEYWORD_MIN_OCCURRENCES <= core_occurrences <= CORE_KEYWORD_MAX_OCCURRENCES:
+        errors.append(
+            "Exact core keyword must appear 3–5 times in visible content; "
+            f"received {core_occurrences}"
+        )
+    if core_blocks < 3:
+        errors.append(
+            "Exact core keyword must be distributed across the lead and at least "
+            f"two later content blocks; received {core_blocks} blocks"
+        )
+    if any(count > 1 for count in core_block_counts):
+        errors.append(
+            "Exact core keyword must not appear more than once in one paragraph, "
+            "heading, list item, table cell, or caption"
+        )
+
+    related_counts: dict[str, int] = {}
+    related_block_indexes: set[int] = set()
+    if related_keywords:
+        for related_keyword in related_keywords:
+            block_counts = [
+                count_exact_phrase(block, related_keyword)
+                for block in content_blocks
+            ]
+            count = sum(block_counts)
+            related_counts[related_keyword] = count
+            related_block_indexes.update(
+                index for index, block_count in enumerate(block_counts) if block_count
+            )
+            if not 1 <= count <= 2:
+                errors.append(
+                    f'Related keyword "{related_keyword}" must appear 1–2 times '
+                    f"in visible content; received {count}"
+                )
+            if any(block_count > 1 for block_count in block_counts):
+                errors.append(
+                    f'Related keyword "{related_keyword}" must not appear more '
+                    "than once in one content block"
+                )
+
+        related_total = sum(related_counts.values())
+        if not (
+            RELATED_KEYWORD_MIN_TOTAL_OCCURRENCES
+            <= related_total
+            <= RELATED_KEYWORD_MAX_TOTAL_OCCURRENCES
+        ):
+            errors.append(
+                "Selected related keywords must appear 3–5 times in total in "
+                f"visible content; received {related_total}"
+            )
+        if len(related_block_indexes) < 2:
+            errors.append(
+                "Related keywords must be distributed across at least two content "
+                f"blocks; received {len(related_block_indexes)}"
+            )
+    else:
+        related_total = 0
+
+    return (
+        core_occurrences,
+        core_blocks,
+        related_counts,
+        related_total,
+        len(related_block_indexes),
+        errors,
+    )
+
+
+def validate_non_faq_h3_depth(
+    h2s: list[dict[str, str]],
+    h3_sections: list[dict[str, object]],
+    visible_characters: int,
+) -> tuple[int, int, int, int, list[str]]:
+    errors: list[str] = []
+    non_faq_h2_indexes = {
+        index
+        for index, heading in enumerate(h2s)
+        if heading["text"].casefold() not in FAQ_HEADING_TEXTS
+    }
+    non_faq_h3s = [
+        section for section in h3_sections if not bool(section.get("is_faq"))
+    ]
+    non_faq_h3_count = len(non_faq_h3s)
+
+    length_minimum = (
+        6 if visible_characters < 12000 else 7 if visible_characters < 13500 else 8
+    )
+    length_parent_minimum = 3 if visible_characters < 12000 else 4
+    required_parent_sections = min(
+        len(non_faq_h2_indexes),
+        max(length_parent_minimum, math.ceil(len(non_faq_h2_indexes) / 2)),
+    )
+    minimum_h3_count = max(length_minimum, required_parent_sections + 1)
+    maximum_h3_count = min(
+        NON_FAQ_H3_MAX_COUNT,
+        max(minimum_h3_count, len(non_faq_h2_indexes) * 2),
+    )
+
+    parent_indexes = {
+        section.get("parent_h2_index")
+        for section in non_faq_h3s
+        if section.get("parent_h2_index") in non_faq_h2_indexes
+    }
+    if not minimum_h3_count <= non_faq_h3_count <= maximum_h3_count:
+        errors.append(
+            "Non-FAQ body content must contain "
+            f"{minimum_h3_count}–{maximum_h3_count} H3 subheadings for this "
+            f"article length and H2 structure; received {non_faq_h3_count}"
+        )
+    if len(parent_indexes) < required_parent_sections:
+        errors.append(
+            "Non-FAQ H3 subheadings must deepen at least "
+            f"{required_parent_sections} different non-FAQ H2 sections; "
+            f"received {len(parent_indexes)}"
+        )
+
+    normalized_headings = [
+        normalize_title_match(str(section.get("text", "")))
+        for section in non_faq_h3s
+    ]
+    if any(not heading for heading in normalized_headings):
+        errors.append("Every non-FAQ H3 must have descriptive visible text")
+    if len(set(normalized_headings)) != len(normalized_headings):
+        errors.append("Non-FAQ H3 subheadings must be unique")
+
+    for section in non_faq_h3s:
+        heading = normalize_space(str(section.get("text", ""))) or "(empty H3)"
+        text_parts = section.get("text_parts", [])
+        if not isinstance(text_parts, list):
+            text_parts = []
+        section_text = normalize_space(
+            " ".join(str(part) for part in text_parts).replace(PLACEHOLDER, "")
+        )
+        section_characters = len(section_text)
+        block_count = section.get("block_count", 0)
+        if not isinstance(block_count, int):
+            block_count = 0
+        if block_count < 1:
+            errors.append(
+                f'Non-FAQ H3 "{heading}" must be followed by at least one '
+                "paragraph, list item, table cell, or caption before the next heading"
+            )
+        if section_characters < NON_FAQ_H3_MIN_CONTENT_CHARACTERS:
+            errors.append(
+                f'Non-FAQ H3 "{heading}" must develop at least '
+                f"{NON_FAQ_H3_MIN_CONTENT_CHARACTERS} visible characters before "
+                f"the next H3 or H2; received {section_characters}"
+            )
+
+    return (
+        non_faq_h3_count,
+        len(parent_indexes),
+        required_parent_sections,
+        minimum_h3_count,
+        errors,
+    )
+
+
 def image_fingerprint(path: Path) -> tuple[str, str, int, int]:
     source_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     with Image.open(path) as source:
@@ -575,7 +937,9 @@ class ArticleParser(HTMLParser):
         self.text_parts: list[str] = []
         self.style_parts: list[str] = []
         self.headings: list[dict[str, str]] = []
+        self.h3_sections: list[dict[str, object]] = []
         self.links: list[tuple[str, str]] = []
+        self.content_blocks: list[str] = []
         self.first_paragraph_segments: list[tuple[str, str | None]] = []
         self.h1_count = 0
         self.img_count = 0
@@ -601,9 +965,13 @@ class ArticleParser(HTMLParser):
         self._div_table_wrap_stack: list[bool] = []
         self._paragraph_depth = 0
         self._cta_marker_stack: list[str] = []
+        self._content_block_stack: list[dict[str, object]] = []
         self._first_paragraph_complete = False
         self._seen_h2 = False
         self._faq_active = False
+        self._current_h2_index: int | None = None
+        self._current_h2_text = ""
+        self._active_h3_section: dict[str, object] | None = None
         self.faq_questions = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -625,6 +993,8 @@ class ArticleParser(HTMLParser):
                 self.article_wrapper_count += 1
                 self._article_depth += 1
             return
+        if self._article_depth and tag in ARTICLE_KEYWORD_BLOCK_TAGS:
+            self._content_block_stack.append({"tag": tag, "parts": []})
         cta_marker = normalize_space(values.get("data-article-cta", "")).lower()
         if cta_marker:
             if not self._article_depth:
@@ -658,6 +1028,7 @@ class ArticleParser(HTMLParser):
         if tag == "h1":
             self.h1_count += 1
         elif tag in {"h2", "h3"}:
+            self._active_h3_section = None
             if tag == "h3" and not self._seen_h2:
                 self.errors.append("H3 appears before any H2")
             if tag == "h2":
@@ -685,8 +1056,16 @@ class ArticleParser(HTMLParser):
         if self._ignored_depth or not self._article_depth:
             return
         self.text_parts.append(data)
+        if self._content_block_stack:
+            parts = self._content_block_stack[-1]["parts"]
+            if isinstance(parts, list):
+                parts.append(data)
         if self._current_heading is not None:
             self._current_heading["text"] += data
+        elif self._active_h3_section is not None:
+            parts = self._active_h3_section["text_parts"]
+            if isinstance(parts, list):
+                parts.append(data)
         if self._current_link_href is not None:
             self._current_link_text.append(data)
         if self._cta_marker_stack:
@@ -702,18 +1081,46 @@ class ArticleParser(HTMLParser):
         if tag == "script" and self._ignored_depth:
             self._ignored_depth -= 1
             return
+        if (
+            self._content_block_stack
+            and self._content_block_stack[-1]["tag"] == tag
+        ):
+            block = self._content_block_stack.pop()
+            parts = block["parts"]
+            if isinstance(parts, list):
+                text = normalize_space("".join(str(part) for part in parts))
+                if text:
+                    self.content_blocks.append(text)
+                    if (
+                        self._active_h3_section is not None
+                        and tag not in {"h2", "h3"}
+                    ):
+                        block_count = self._active_h3_section["block_count"]
+                        if isinstance(block_count, int):
+                            self._active_h3_section["block_count"] = block_count + 1
         if tag in {"h2", "h3"} and self._current_heading is not None:
             heading = self._current_heading
             heading["text"] = normalize_space(heading["text"])
             self.headings.append(heading)
             if tag == "h2":
-                self._faq_active = heading["text"].lower() in {
-                    "faq",
-                    "faqs",
-                    "frequently asked questions",
+                self._current_h2_index = sum(
+                    item["tag"] == "h2" for item in self.headings
+                ) - 1
+                self._current_h2_text = heading["text"]
+                self._faq_active = heading["text"].casefold() in FAQ_HEADING_TEXTS
+            else:
+                section: dict[str, object] = {
+                    "text": heading["text"],
+                    "parent_h2_index": self._current_h2_index,
+                    "parent_h2_text": self._current_h2_text,
+                    "is_faq": self._faq_active,
+                    "text_parts": [],
+                    "block_count": 0,
                 }
-            elif self._faq_active:
-                self.faq_questions += 1
+                self.h3_sections.append(section)
+                self._active_h3_section = section
+                if self._faq_active:
+                    self.faq_questions += 1
             self._current_heading = None
         elif tag == "a" and self._current_link_href is not None:
             link = (self._current_link_href, normalize_space("".join(self._current_link_text)))
@@ -729,6 +1136,7 @@ class ArticleParser(HTMLParser):
             if was_table_wrap:
                 self._table_wrap_depth -= 1
         elif tag == "article" and self._article_depth:
+            self._active_h3_section = None
             self._article_depth -= 1
         if self._cta_marker_stack and tag == self._cta_marker_stack[-1]:
             self._cta_marker_stack.pop()
@@ -1082,6 +1490,7 @@ def validate_article_ending(
     target_country: str,
     target_customer: str,
     search_intent: str,
+    buyer_stage: str,
     ending_mode: str,
 ) -> tuple[int, list[str], list[str]]:
     errors: list[str] = []
@@ -1089,23 +1498,38 @@ def validate_article_ending(
         errors.append("Article contains an unclosed CTA marker element")
     if search_intent not in SEARCH_INTENTS:
         errors.append(f"Invalid search intent: {search_intent}")
+    if buyer_stage not in BUYER_STAGES:
+        errors.append(f"Invalid buyer stage: {buyer_stage}")
     if ending_mode not in ENDING_MODES:
         errors.append(f"Invalid ending mode: {ending_mode}")
 
-    if (
-        search_intent in COMMERCIAL_SEARCH_INTENTS
-        and ending_mode == "informational-close"
-    ):
+    allowed_stage_endings = BUYER_STAGE_ENDING_MODES.get(buyer_stage, set())
+    if ending_mode in ENDING_MODES and ending_mode not in allowed_stage_endings:
         errors.append(
-            f"Commercial search intent {search_intent} requires inline-cta "
-            "or standalone-cta"
+            f"Buyer stage {buyer_stage} does not allow ending mode {ending_mode}"
+        )
+    if search_intent == "foundational-knowledge" and ending_mode != "informational-close":
+        errors.append(
+            "Foundational-knowledge content must use an informational close without "
+            "a quotation or sample CTA"
         )
     if (
-        search_intent in INFORMATIONAL_SEARCH_INTENTS
-        and ending_mode == "standalone-cta"
+        ending_mode == "standalone-cta"
+        and search_intent not in STANDALONE_CTA_SEARCH_INTENTS
     ):
         errors.append(
-            f"Informational search intent {search_intent} must not use standalone-cta"
+            f"Search intent {search_intent} does not justify a standalone CTA"
+        )
+
+    lead_text = normalize_space(
+        "".join(text for text, _ in parser.first_paragraph_segments)
+    )
+    if (
+        buyer_stage == "awareness" or search_intent == "foundational-knowledge"
+    ) and EARLY_CONVERSION_RE.search(lead_text):
+        errors.append(
+            "Awareness and foundational content must not push a quote, sample, or "
+            "custom request in the lead"
         )
 
     if ending_mode == "informational-close":
@@ -1190,15 +1614,20 @@ def validate_intent_analysis(
     path: Path,
     keyword: str,
     search_intent: str,
+    buyer_stage: str,
     host: str,
-) -> tuple[int, int, int, list[str]]:
+) -> tuple[int, int, int, list[str], str, str, list[str]]:
     errors: list[str] = []
     try:
         value = json.loads(read_text(path))
     except (FileNotFoundError, json.JSONDecodeError) as exc:
-        return 0, 0, 0, [f"Intent analysis is unavailable or invalid: {exc}"]
+        return 0, 0, 0, [], "", "", [
+            f"Intent analysis is unavailable or invalid: {exc}"
+        ]
     if not isinstance(value, dict):
-        return 0, 0, 0, ["Intent analysis must be a JSON object"]
+        return 0, 0, 0, [], "", "", [
+            "Intent analysis must be a JSON object"
+        ]
 
     recorded_keyword = normalize_space(str(value.get("core_keyword", "")))
     if recorded_keyword.casefold() != keyword.casefold():
@@ -1208,6 +1637,51 @@ def validate_intent_analysis(
         errors.append("intent-analysis primary_intent must equal --search-intent")
     if recorded_intent not in SEARCH_INTENTS:
         errors.append(f"intent-analysis primary_intent is invalid: {recorded_intent}")
+
+    secondary_intent = normalize_space(str(value.get("secondary_intent", "")))
+    if secondary_intent:
+        if secondary_intent not in SEARCH_INTENTS:
+            errors.append(
+                f"intent-analysis secondary_intent is invalid: {secondary_intent}"
+            )
+        if secondary_intent == recorded_intent:
+            errors.append(
+                "intent-analysis secondary_intent must differ from primary_intent"
+            )
+        secondary_rationale = normalize_space(
+            str(value.get("secondary_intent_rationale", ""))
+        )
+        if len(secondary_rationale) < 30:
+            errors.append(
+                "intent-analysis secondary_intent_rationale must contain at least "
+                "30 characters when a secondary intent is selected"
+            )
+
+    recorded_buyer_stage = normalize_space(str(value.get("buyer_stage", "")))
+    if recorded_buyer_stage != buyer_stage:
+        errors.append("intent-analysis buyer_stage must equal --buyer-stage")
+    if recorded_buyer_stage not in BUYER_STAGES:
+        errors.append(
+            f"intent-analysis buyer_stage is invalid: {recorded_buyer_stage}"
+        )
+    allowed_stages = SEARCH_INTENT_BUYER_STAGES.get(recorded_intent, set())
+    if recorded_buyer_stage in BUYER_STAGES and recorded_buyer_stage not in allowed_stages:
+        errors.append(
+            f"Buyer stage {recorded_buyer_stage} is incompatible with primary intent "
+            f"{recorded_intent}"
+        )
+    buyer_stage_rationale = normalize_space(
+        str(value.get("buyer_stage_rationale", ""))
+    )
+    if len(buyer_stage_rationale) < 30:
+        errors.append(
+            "intent-analysis buyer_stage_rationale must contain at least 30 characters"
+        )
+    editorial_stance = normalize_space(str(value.get("editorial_stance", "")))
+    if editorial_stance != "neutral-buyer-guidance":
+        errors.append(
+            "intent-analysis editorial_stance must be neutral-buyer-guidance"
+        )
 
     keyword_signals = nonempty_string_list(value.get("keyword_signals"))
     if not keyword_signals:
@@ -1228,6 +1702,8 @@ def validate_intent_analysis(
             )
         if rejected_intent == search_intent:
             errors.append("intent-analysis cannot reject its selected primary intent")
+        if secondary_intent and rejected_intent == secondary_intent:
+            errors.append("intent-analysis cannot reject its selected secondary intent")
 
     related_queries = nonempty_string_list(value.get("related_queries"))
     if related_queries is None or not 2 <= len(related_queries) <= 6:
@@ -1238,6 +1714,12 @@ def validate_intent_analysis(
         related_queries = []
     if len({item.casefold() for item in related_queries}) != len(related_queries):
         errors.append("intent-analysis related queries must be distinct")
+
+    related_keywords, related_keyword_errors = validate_related_keywords(
+        value.get("related_keywords"),
+        keyword,
+    )
+    errors.extend(related_keyword_errors)
 
     research_sources = value.get("research_sources")
     if not isinstance(research_sources, list) or not 2 <= len(research_sources) <= 8:
@@ -1324,6 +1806,9 @@ def validate_intent_analysis(
         len(research_sources),
         same_site_sources,
         external_sources,
+        related_keywords,
+        secondary_intent,
+        recorded_buyer_stage,
         errors,
     )
 
@@ -2499,6 +2984,7 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
     title_angle = normalize_space(args.title_angle)
     title_pattern = normalize_space(args.title_pattern)
     search_intent = normalize_space(args.search_intent)
+    buyer_stage = normalize_space(args.buyer_stage)
     ending_mode = normalize_space(args.ending_mode)
     host = args.site_host.lower().strip().rstrip(".")
     errors: list[str] = []
@@ -2509,6 +2995,16 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         target_customer,
     )
     (
+        title_question_roll,
+        title_mode,
+        title_is_question,
+        title_mode_errors,
+    ) = validate_title_mode(
+        title,
+        keyword,
+        args.title_mode_seed,
+    )
+    (
         title_history_compared,
         max_title_similarity,
         title_diversity_errors,
@@ -2517,19 +3013,25 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         keyword,
         title_angle,
         title_pattern,
+        title_mode,
         args.title_history_file,
     )
     errors.extend(audience_title_errors)
+    errors.extend(title_mode_errors)
     errors.extend(title_diversity_errors)
     (
         research_source_count,
         same_site_research_sources,
         external_research_sources,
+        related_keywords,
+        secondary_intent,
+        recorded_buyer_stage,
         intent_analysis_errors,
     ) = validate_intent_analysis(
         args.intent_analysis_file,
         keyword,
         search_intent,
+        buyer_stage,
         host,
     )
     errors.extend(intent_analysis_errors)
@@ -2556,8 +3058,8 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         errors.append(f"Title must be 1–100 characters; received {len(title)}")
     if title != seo_title:
         errors.append("seo_title1 must equal title")
-    if keyword.lower() not in title.lower():
-        errors.append("Title must contain the exact core keyword")
+    if re.search(r"\b(?:we|our|ours)\b", title, flags=re.IGNORECASE):
+        errors.append("Title must use a neutral third-person editorial voice")
     bad_title_tokens = title_case_errors(title)
     if bad_title_tokens:
         errors.append("Title is not Title Case: " + ", ".join(bad_title_tokens[:8]))
@@ -2574,8 +3076,8 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
             f"Placeholder count must equal content image count; "
             f"received {placeholder_count} and {args.content_images}"
         )
-    if not 2 <= args.content_images <= 4:
-        errors.append("Content image count must be between 2 and 4")
+    if not 4 <= args.content_images <= 5:
+        errors.append("Content image count must be between 4 and 5")
     if len(alt_texts) != args.content_images:
         errors.append(
             f"Alt text count must equal content image count; "
@@ -2600,6 +3102,7 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         target_country,
         target_customer,
         search_intent,
+        buyer_stage,
         ending_mode,
     )
     errors.extend(ending_errors)
@@ -2710,8 +3213,8 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         )
 
     h2s = [heading for heading in parser.headings if heading["tag"] == "h2"]
-    if not 4 <= len(h2s) <= 8:
-        errors.append(f"Article must contain 4–8 H2 headings; received {len(h2s)}")
+    if not 5 <= len(h2s) <= 9:
+        errors.append(f"Article must contain 5–9 H2 headings; received {len(h2s)}")
     heading_ids = [heading["id"] for heading in parser.headings if heading["id"]]
     if any(not ANCHOR_RE.fullmatch(value) for value in heading_ids):
         errors.append("Heading ids must use lowercase words and hyphens")
@@ -2722,17 +3225,47 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
 
     visible = normalize_space(" ".join(parser.text_parts).replace(PLACEHOLDER, ""))
     visible_characters = len(visible)
-    if not 5000 <= visible_characters <= 10000:
+    if not (
+        ARTICLE_MIN_VISIBLE_CHARACTERS
+        <= visible_characters
+        <= ARTICLE_MAX_VISIBLE_CHARACTERS
+    ):
         errors.append(
-            f"Visible article content must be 5,000–10,000 characters; "
+            "Visible article content must be 10,000–15,000 characters; "
             f"received {visible_characters}"
         )
-    expected_images = 2 if visible_characters < 6500 else 3 if visible_characters < 8500 else 4
+    (
+        non_faq_h3_count,
+        non_faq_h3_parent_sections,
+        non_faq_h3_required_parent_sections,
+        non_faq_h3_minimum_required,
+        h3_depth_errors,
+    ) = validate_non_faq_h3_depth(
+        h2s,
+        parser.h3_sections,
+        visible_characters,
+    )
+    errors.extend(h3_depth_errors)
+    expected_images = 4 if visible_characters < 12500 else 5
     if args.content_images != expected_images:
         errors.append(
             f"Visible length requires {expected_images} body images; "
             f"received {args.content_images}"
         )
+
+    (
+        core_keyword_occurrences,
+        core_keyword_blocks,
+        related_keyword_occurrences,
+        related_keyword_occurrences_total,
+        related_keyword_blocks,
+        keyword_usage_errors,
+    ) = validate_keyword_usage(
+        parser.content_blocks,
+        keyword,
+        related_keywords,
+    )
+    errors.extend(keyword_usage_errors)
 
     first_paragraph = normalize_space(
         "".join(text for text, _ in parser.first_paragraph_segments)
@@ -2779,6 +3312,11 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
     for phrase in banned:
         if phrase in lowered:
             errors.append(f"Unsupported promotional phrase: {phrase}")
+    if re.search(r"\b(?:we|our|ours)\b", visible, flags=re.IGNORECASE):
+        errors.append(
+            "Article content must use a neutral third-person editorial voice, not "
+            "first-person brand promotion"
+        )
 
     result: dict[str, object] = {
         "valid": not errors,
@@ -2786,10 +3324,17 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
             "title_characters": len(title),
             "title_angle": title_angle,
             "title_pattern": title_pattern,
+            "title_question_probability": QUESTION_TITLE_PROBABILITY,
+            "title_question_roll": title_question_roll,
+            "title_mode": title_mode,
+            "title_is_question": title_is_question,
             "title_history_compared": title_history_compared,
             "max_title_similarity": max_title_similarity,
             "target_audience_title_terms": audience_title_terms,
             "search_intent": search_intent,
+            "secondary_intent": secondary_intent,
+            "selected_intent_count": 1 + int(bool(secondary_intent)),
+            "buyer_stage": recorded_buyer_stage,
             "ending_mode": ending_mode,
             "cta_inline_markers": parser.cta_inline_count,
             "cta_standalone_markers": parser.cta_standalone_count,
@@ -2798,9 +3343,29 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
             "research_sources": research_source_count,
             "same_site_research_sources": same_site_research_sources,
             "external_research_sources": external_research_sources,
+            "core_keyword_occurrences": core_keyword_occurrences,
+            "core_keyword_blocks": core_keyword_blocks,
+            "related_keywords": related_keywords,
+            "related_keyword_occurrences": related_keyword_occurrences,
+            "related_keyword_occurrences_total": related_keyword_occurrences_total,
+            "related_keyword_blocks": related_keyword_blocks,
             "seo_description_characters": len(seo_desc),
             "visible_characters": visible_characters,
+            "visible_characters_preferred_range": (
+                ARTICLE_PREFERRED_MIN_VISIBLE_CHARACTERS
+                <= visible_characters
+                <= ARTICLE_PREFERRED_MAX_VISIBLE_CHARACTERS
+            ),
             "h2_count": len(h2s),
+            "non_faq_h3_count": non_faq_h3_count,
+            "non_faq_h3_parent_sections": non_faq_h3_parent_sections,
+            "non_faq_h3_required_parent_sections": (
+                non_faq_h3_required_parent_sections
+            ),
+            "non_faq_h3_minimum_required": non_faq_h3_minimum_required,
+            "non_faq_h3_minimum_content_characters": (
+                NON_FAQ_H3_MIN_CONTENT_CHARACTERS
+            ),
             "faq_questions": parser.faq_questions,
             "internal_links": len(internal_links),
             "content_images": args.content_images,
@@ -2848,8 +3413,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-customer", required=True)
     parser.add_argument("--title-angle", choices=sorted(TITLE_ANGLES), required=True)
     parser.add_argument("--title-pattern", choices=sorted(TITLE_PATTERNS), required=True)
+    parser.add_argument("--title-mode-seed", required=True)
     parser.add_argument("--title-history-file", type=Path, required=True)
     parser.add_argument("--search-intent", choices=sorted(SEARCH_INTENTS), required=True)
+    parser.add_argument("--buyer-stage", choices=sorted(BUYER_STAGES), required=True)
     parser.add_argument("--ending-mode", choices=sorted(ENDING_MODES), required=True)
     parser.add_argument("--intent-analysis-file", type=Path, required=True)
     parser.add_argument("--site-host", required=True)

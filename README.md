@@ -7,7 +7,16 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 ## Highlights
 
 - Processes at most one pending row per configured site tab in a run.
-- Selects one primary search intent for each article.
+- Selects one primary intent from a seven-type taxonomy, allows at most one subordinate intent,
+  and aligns the ending with the buyer's stage.
+- Uses an auditable seeded 70/30 question-versus-statement title mode while requiring the exact
+  keyword to be integrated naturally instead of used as a colon prefix.
+- Targets 12,000–13,500 visible characters and validates a 10,000–15,000-character range.
+- Uses neutral third-person buyer guidance, including evidence-led treatment of manufacturer lists.
+- Adds length-adjusted, substantive H3 analysis across multiple non-FAQ H2 sections instead of
+  limiting H3s to FAQ questions.
+- Requires the exact core keyword 3–5 times and 2–4 intent-aligned related keywords with 3–5
+  combined occurrences, distributed naturally across the visible article content.
 - Prevents target-country and target-customer fields from becoming repetitive title templates.
 - Matches article typography and table colors to each site's observed theme.
 - Builds and deduplicates a same-site image candidate pool before assigning image slots.
@@ -34,9 +43,14 @@ It combines keyword-led search-intent research, title and outline diversity, sit
     ├── optimize_image.py
     ├── prepare_locked_product.py
     ├── publish_article.py
+    ├── select_title_mode.py
     ├── validate_article.py
     └── verify_article.py
 └── tests/
+    ├── test_validate_article_h3_depth.py
+    ├── test_validate_article_intent.py
+    ├── test_validate_article_keywords.py
+    ├── test_validate_article_title_mode.py
     └── test_verify_article.py
 ```
 

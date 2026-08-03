@@ -59,15 +59,23 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      in the row manifest.
    - Infer the user's search purpose primarily from `核心关键字`. Use query modifiers and phrasing
      first; use `目标国家`, `目标客户`, and `相关产品链接` only to disambiguate and deepen the chosen
-     intent. Select exactly one primary intent. Do not combine unrelated knowledge, comparison,
-     supplier, OEM/ODM, specification, troubleshooting, purchasing, and quotation intents merely
-     to cover more keywords.
+     intent. Select exactly one primary intent from the seven types in
+     `references/content-spec.md`. Select zero or one secondary intent only when it directly
+     supports the primary intent; never give both equal weight or join unrelated topics.
+   - Classify the buyer stage as exactly one of `awareness`, `consideration`, `evaluation`, or
+     `inquiry` from the keyword evidence. Record why the query belongs to that stage and use the
+     stage—not a fixed commercial template—to control the ending and next action.
    - Search two to six closely related queries before drafting. Prefer current primary sources,
      standards bodies, regulators, industry associations, and technically credible references.
      Use external research for general context only; never replace verified site/product facts with
      competitor claims or copy another page's wording, outline, or examples.
-   - Save the keyword signals, intent rationale, rejected intents, related queries, same-site
-     sources, external research sources, access dates, and freshness notes in
+   - Select 2–4 natural English `related_keywords` from the related-query and source evidence.
+     Keep every phrase within the same primary intent, use 2–8 words, and reject phrases that
+     equal, contain, or are contained by the core keyword or another selected related keyword.
+   - Save the keyword signals, primary and optional secondary intent, intent rationales, rejected
+     intents, buyer stage and rationale, `neutral-buyer-guidance` editorial stance, related queries,
+     selected related keywords, same-site sources, external research sources, access dates, and
+     freshness notes in
      `<row-run-dir>/intent-analysis.json`. Require at least one same-site source and one external
      source; when no credible external source exists, record a concrete
      `external_source_reason`.
@@ -89,10 +97,10 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      "correct" label text.
    - Record whether the site has product visuals, visibly branded product visuals, and legible
      product labels. A generic category illustration does not count as a product reference.
-   - Choose one primary search-intent slug from `references/content-spec.md`, record it as
-     `search_intent`, require it to match `intent-analysis.json`, and use it to decide the article
-     ending. Stop and mark the row failed if the site lacks enough trustworthy product context to
-     produce the minimum article length.
+   - Record the selected primary slug as `search_intent`, the optional subordinate slug as
+     `secondary_intent`, and the stage as `buyer_stage`; require all three to match
+     `intent-analysis.json`. Stop and mark the row failed if the site lacks enough trustworthy
+     product context to produce the minimum article length.
 
 4. **Draft and generate images**
    - Follow `references/content-spec.md`. Save `title.txt`, `seo_title1.txt`, `remark.txt`,
@@ -103,27 +111,57 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      codes, customer segments, buyer roles, or formulas such as `for <customer> in <country>`. The
      only exception is an audience term already present inside the exact `核心关键字`; do not add
      another audience term.
+   - Before drafting the title, create the immutable seed
+     `<run-id>|<tab>|<sheet-row-number>|<exact-core-keyword>` and run
+     `scripts/select_title_mode.py`. Save the result as `<row-run-dir>/title-mode.json`; never
+     redraw or change the seed after seeing the result. Rolls 0–69 require a question title and
+     rolls 70–99 require a statement title, producing an auditable 70% question probability.
    - Select one evidence-based title angle and one title pattern from
      `references/content-spec.md`. Use the least-used available angles and patterns so each set is
      rotated once before reuse; never repeat either one on consecutive current-run titles and never
      reuse the same angle-pattern pair within a run. Compare the draft against `title-history.json`
      and rewrite exact, template-level, or high-overlap matches. Record `title_angle` and
-     `title_pattern` in the row manifest.
+     `title_pattern` in the row manifest. Treat question/statement mode separately from the pattern
+     so question titles still rotate among how, which, why, comparison, risk, process, and decision
+     structures.
+   - Include the exact core keyword once as a grammatical part of the title sentence. Do not use
+     `<keyword>: <subtitle>`, `<keyword> - <subtitle>`, or a bare keyword followed by punctuation.
+     Give the keyword a natural subject, verb, decision, comparison, or consequence. Use a neutral
+     third-person editorial voice in both title and article; do not write as “we” or “our.”
+   - For “top N,” “best,” “leading,” or manufacturer-list queries, use transparent inclusion
+     criteria, current evidence, and neutral ordering. Apply the same criteria to the host company
+     and other named companies; do not invent ranks, imply endorsement, or turn the article into a
+     disguised advertisement.
    - Use the site page title as the page H1; do not add an `<h1>` inside `content.html`.
    - Select one `ending_mode` from `informational-close`, `inline-cta`, or `standalone-cta` according
-     to the search-intent rules in `references/content-spec.md`, and record it in the row manifest.
-     Do not generate a fixed CTA for every article. Prefer a useful conclusion for informational
-     intent and a short contextual CTA naturally integrated into the ending for commercial intent.
+     to the buyer-stage rules in `references/content-spec.md`, and record it in the row manifest.
+     Do not generate a fixed CTA for every article. Awareness content must close informationally;
+     consideration and evaluation content may suggest a relevant next check; inquiry content may
+     naturally request specifications, samples, customization details, or a quotation.
      Use a standalone CTA section only when it adds specific decision or RFQ value that cannot fit
      naturally into the preceding section.
    - Mark an inline CTA only as `<p data-article-cta="inline">...</p>` and a standalone CTA only as
      `<section data-article-cta="standalone">...</section>`. Do not label readers by target country
      or target customer, and do not reuse headings or phrases such as “Buyers ready to,” “Build a
      comparable RFQ,” or “Request a comparable proposal.”
-   - Build every H2 around the single primary intent and the current research evidence. Vary the
+   - Build every H2 around the single primary intent and the current research evidence. Use an
+     optional secondary intent only where it helps answer the primary question. Vary the
      outline, lead, examples, comparison dimensions, table structure, FAQ questions, and ending
      across articles. Add source-derived decision value rather than padding to a fixed word count.
      Do not reuse a standard article skeleton or splice in sections that answer a different intent.
+   - Deepen the existing non-FAQ H2 sections with topic-specific H3 subheadings according to the
+     length and section-coverage rules in `references/content-spec.md`. FAQ questions do not count
+     toward this requirement. Give every non-FAQ H3 at least 180 visible characters of substantive
+     explanation before the next heading, and distribute H3s across multiple H2 sections instead of
+     mechanically splitting one section or repeating generic labels.
+   - Use the exact core keyword 3–5 times in the visible `content.html` article copy. Count the
+     linked lead occurrence, then distribute the remaining occurrences across at least two later
+     paragraphs, headings, list items, table cells, or captions. Never repeat it twice in one
+     content block, and do not force every occurrence into headings.
+   - Use every selected `related_keyword` 1–2 times and keep their combined visible occurrences at
+     3–5 across at least two content blocks. Count only visible article copy, not `title`, SEO
+     fields, CSS, HTML attributes, image alt text, hidden text, or page chrome. Rewrite the sentence
+     when an exact phrase sounds forced; never add an unrelated section merely to satisfy a count.
    - Do not generate a table of contents or `<nav class="article-toc">`. Start `content.html` with
      the scoped style block from `assets/article-content-style.html`, then wrap the article in
      `<article class="article-content">`.
@@ -180,9 +218,9 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      exact product identity, fail the image and row; do not fall back to deterministic compositing,
      the unchanged source, or a `contain`-only output. Use same-site factory, application,
      laboratory, production, or service references for `non-product` images whenever available.
-   - Create one thumbnail plus 2 body images for 5,000–6,499 visible characters, 3 for
-     6,500–8,499, or 4 for 8,500–10,000. Do not invent packaging, certificates, factories, test
-     results, label text, or specifications.
+   - Target 12,000–13,500 visible characters and require 10,000–15,000. Create one thumbnail plus
+     4 body images below 12,500 visible characters or 5 body images from 12,500–15,000. Do not
+     invent packaging, certificates, factories, test results, label text, or specifications.
    - When same-site branded/labelled product visuals exist, require the thumbnail and at least one
      body image to show the original brand and legible label accurately. Do not satisfy this rule
      by shrinking, blurring, turning away, or obscuring the package.
@@ -204,8 +242,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 
 5. **Validate**
    - Run `scripts/validate_article.py` with the final copy, keyword, target country, target
-     customer, search intent, ending mode, title angle, title pattern, title history, site host,
-     intent-analysis file, image count, and ordered alt texts.
+     customer, title-mode seed, primary search intent, buyer stage, ending mode, title angle, title
+     pattern, title history, site host, intent-analysis file, image count, and ordered alt texts.
    - Require the validator to confirm no generated TOC, one scoped responsive CSS block, one
      `.article-content` wrapper, responsive table wrappers, mobile breakpoints, and fixed
      pixel-based font sizes. Pass `theme-colors.json` and require exact agreement between its
@@ -222,14 +260,21 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      exception.
    - Require the validator to reject titles derived from target-country or target-customer fields,
      duplicate angle-pattern pairs, exact title duplicates, repeated title templates, and
-     high-overlap titles. After clean validation, append the title, core keyword, title angle, title
+     high-overlap titles. Require the seeded 70/30 title mode, exactly one naturally integrated core
+     keyword, no keyword-plus-colon/dash prefix, and neutral third-person wording. After clean
+     validation, append the title, core keyword, title mode, question roll, title angle, title
      pattern, tab, and `current-run` source to `title-history.json`.
    - Require the validator to reject a mandatory or generic bottom CTA, an ending mode incompatible
      with the search intent, missing/duplicate CTA markers, target-country/customer labels inside a
      CTA, and repeated CTA boilerplate.
-   - Require the validator to confirm one primary keyword-led intent, documented query signals,
-     related searches, current source access dates, same-site evidence, and external research (or a
+   - Require the validator to confirm one primary intent from the seven-type taxonomy, no more than
+     one subordinate secondary intent, a compatible buyer stage, neutral editorial stance,
+     documented query signals, related searches, 2–4 non-overlapping related keywords, exact
+     core-keyword use 3–5 times, related-keyword use 3–5 times in total, natural block-level
+     distribution, current source access dates, same-site evidence, and external research (or a
      concrete no-source reason).
+   - Require length-adjusted non-FAQ H3 counts, coverage across multiple body H2 sections, unique
+     H3 text, and at least 180 visible characters of supporting content beneath every body H3.
    - Verify every internal link returns a successful response and belongs to the site.
    - Require a clean validation result before any API call.
 
@@ -253,8 +298,9 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 7. **Continue and report**
    - Continue to the next site tab after a site-specific failure. Stop the whole run for lost Sheet
      access, invalid headers, or another systemic preflight failure.
-   - Report each tab, source row, search intent, ending mode, title angle, title pattern, final
-     state, article URL, verification result, and manifest path. Never report publishing keys.
+   - Report each tab, source row, primary and optional secondary intent, buyer stage, title mode,
+     ending mode, title angle, title pattern, final state, article URL, verification result, and
+     manifest path. Never report publishing keys.
 
 ## Failure rules
 
@@ -272,12 +318,15 @@ python scripts/analyze_image_pool.py --image CANDIDATE_1 --reference-url SAME_SI
   [--image CANDIDATE_2 --reference-url SAME_SITE_URL_2 ...] --output IMAGE_POOL_JSON
 python scripts/prepare_locked_product.py --source SOURCE_PRODUCT \
   --mask INSPECTED_MASK_PNG --output LOCKED_PRODUCT_PNG --report LOCK_REPORT_JSON
+python scripts/select_title_mode.py --seed "RUN_ID|TAB|ROW_NUMBER|CORE_KEYWORD" \
+  --output TITLE_MODE_JSON
 python scripts/optimize_image.py INPUT OUTPUT --kind thumb|content [--fit cover|contain]
 python scripts/validate_article.py --title-file FILE --seo-title-file FILE \
   --remark-file FILE --seo-desc-file FILE --content-file FILE --keyword TEXT \
   --target-country TEXT --target-customer TEXT --title-angle ANGLE \
-  --title-pattern PATTERN --title-history-file FILE --search-intent INTENT \
-  --ending-mode MODE --intent-analysis-file FILE --site-host HOST \
+  --title-pattern PATTERN --title-mode-seed TEXT --title-history-file FILE \
+  --search-intent INTENT --buyer-stage STAGE --ending-mode MODE \
+  --intent-analysis-file FILE --site-host HOST \
   --theme-colors-file FILE --content-images N --alt-text-file FILE \
   --image-reference-file FILE
 python scripts/publish_article.py --endpoint URL --title-file FILE --seo-title-file FILE \

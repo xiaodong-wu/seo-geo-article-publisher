@@ -4,14 +4,16 @@
 
 - Write for Google Search, Google AI Overviews, AI Mode, Bing, Copilot, and overseas B2B buyers.
 - Use the core keyword, target country, target customer, related product URL, and researched site
-  facts. Choose exactly one `search_intent`: `product-education`, `feature-application`,
-  `comparison`, `supplier-manufacturer-discovery`, `oem-odm`, `specifications`,
-  `problem-solving`, `purchasing-advice`, or `quotation-customization`.
+  facts. Choose exactly one primary `search_intent` from the seven-type taxonomy below. Select zero
+  or one subordinate `secondary_intent` only when it is necessary to answer the primary purpose.
+- Classify exactly one `buyer_stage`: `awareness`, `consideration`, `evaluation`, or `inquiry`.
 - Use target country and target customer as silent audience context for research and body content,
   never as automatic title text.
 - Separate confirmed site facts, general industry knowledge, and information that must be confirmed.
 - Never invent specifications, certifications, test results, prices, MOQ, lead times, rankings,
   sales, reviews, cases, research, or expert claims.
+- Use a neutral third-person editorial stance. Do not frame the host site as “we” or “our,” and do
+  not privilege its products or capabilities over alternatives without comparable evidence.
 
 ## Search-intent analysis and research
 
@@ -19,23 +21,39 @@ Treat the exact core keyword as the primary evidence of search purpose. Use targ
 customer, and the related product page only to resolve ambiguity and select relevant examples; do
 not let those fields turn one keyword into multiple article purposes.
 
-Use these signals:
+Use these seven article types:
 
-| Keyword signal | Primary intent |
-| --- | --- |
-| what, meaning, guide, how it works, industry basics | `product-education` |
-| feature, benefit, use, application, suitable for | `feature-application` |
-| vs, compare, difference, alternative, material choice | `comparison` |
-| supplier, manufacturer, factory, company, wholesale source | `supplier-manufacturer-discovery` |
-| OEM, ODM, private label, custom formula, contract manufacturing | `oem-odm` |
-| specification, size, grade, material, parameter, tolerance | `specifications` |
-| problem, failure, troubleshooting, how to choose or use correctly | `problem-solving` |
-| buy, source, cost factors, procurement, selection checklist | `purchasing-advice` |
-| quote, quotation, RFQ, custom request, sample request | `quotation-customization` |
+| Search intent | Typical keyword signals | Required emphasis |
+| --- | --- | --- |
+| `foundational-knowledge` | what, meaning, basics, how it works, technology, process | accurate definition, operating principle, key parameters, common uses, suitable and unsuitable conditions |
+| `product-selection` | how to choose, selection, specification, grade, size, tolerance, buying criteria | procurement criteria, parameter meaning, quality verification, common mistakes, information to confirm before inquiry |
+| `product-comparison` | vs, compare, difference, alternative, material or solution choice | identical comparison dimensions, advantages and limitations, suitable applications, no deliberate disparagement |
+| `oem-odm` | OEM, ODM, private label, custom formula, custom specification, contract manufacturing | customization scope, specification or formula confirmation, samples, packaging, MOQ and lead-time factors, quality documents |
+| `supplier-evaluation` | manufacturer, supplier, factory, partner, wholesale source, top manufacturers | production and quality capability, document verification, communication, samples, delivery, after-sales support, cooperation risk |
+| `application-scenario` | application, use case, industry, environment, suitable for, target outcome | operating conditions, buyer pain points, fit logic, limitations, implementation and purchasing cautions |
+| `problem-solving` | problem, failure, defect, troubleshooting, fix, prevent, use correctly | problem definition, common causes, diagnostic steps, remedies, escalation to a supplier or specialist |
 
-When signals overlap, choose the intent that best matches the dominant wording of the core keyword,
-then confirm it against the related product page. Record why plausible alternatives were rejected.
-Keep every H2, table, FAQ, image, and ending relevant to the selected intent.
+Choose exactly one primary intent. Select a secondary intent only when it is a supporting lens, such
+as using one application example inside a foundational explanation or adding supplier-verification
+checks to a product-selection article. Do not give the secondary intent its own unrelated outline,
+and never select more than two intents in total.
+
+Treat quotation, RFQ, sample, and custom-request words primarily as buyer-stage signals. Determine
+the underlying article type from the object of the request: an OEM quotation remains `oem-odm`, a
+manufacturer shortlist remains `supplier-evaluation`, and a specification-led purchase remains
+`product-selection`.
+
+| Buyer stage | Query evidence | Content and ending behavior |
+| --- | --- | --- |
+| `awareness` | what, basics, meaning, how it works, early problem discovery | explain first; use an informational close and do not push a quote or sample request |
+| `consideration` | options, uses, suitability, comparison, how to choose | clarify tradeoffs and suggest the next relevant check; a soft inline action is optional |
+| `evaluation` | specifications, validation, supplier capability, documents, risks | provide verification criteria and evidence requests; a contextual inline action is appropriate |
+| `inquiry` | quote, RFQ, sample, custom request, MOQ, lead time | help the buyer submit specifications and requirements; inline or substantive standalone CTA is allowed |
+
+When signals overlap, choose the primary intent that best matches the dominant wording of the core
+keyword, then confirm it against the related product page. Record why plausible alternatives were
+rejected, why any secondary intent is necessary, and why the buyer stage fits. Keep every H2, table,
+FAQ, image, and ending relevant to the primary intent.
 
 Search two to six related queries before drafting. Use at least two current sources, including one
 same-site product/service source and one credible external source when available. Prefer official
@@ -50,13 +68,22 @@ Save `intent-analysis.json`:
 ```json
 {
   "core_keyword": "thermal paper roll specifications",
-  "primary_intent": "specifications",
+  "primary_intent": "product-selection",
+  "secondary_intent": "",
   "keyword_signals": ["specifications", "roll"],
   "intent_rationale": "The query asks for measurable roll requirements rather than a supplier list or quotation.",
-  "rejected_intents": ["supplier-manufacturer-discovery", "quotation-customization"],
+  "secondary_intent_rationale": "",
+  "rejected_intents": ["supplier-evaluation", "oem-odm"],
+  "buyer_stage": "evaluation",
+  "buyer_stage_rationale": "The query focuses on checking parameters before a purchase or supplier decision.",
+  "editorial_stance": "neutral-buyer-guidance",
   "related_queries": [
     "thermal paper roll width core diameter tolerance",
     "thermal paper roll storage standard"
+  ],
+  "related_keywords": [
+    "receipt roll dimensions",
+    "thermal media storage"
   ],
   "external_source_reason": "",
   "research_sources": [
@@ -78,10 +105,26 @@ Save `intent-analysis.json`:
 }
 ```
 
+Use only these intent-stage combinations:
+
+- `foundational-knowledge`: `awareness` or `consideration`;
+- `product-selection`: `consideration`, `evaluation`, or `inquiry`;
+- `product-comparison`: `consideration` or `evaluation`;
+- `oem-odm`: `consideration`, `evaluation`, or `inquiry`;
+- `supplier-evaluation`: `consideration`, `evaluation`, or `inquiry`;
+- `application-scenario`: `awareness`, `consideration`, or `evaluation`;
+- `problem-solving`: any of the four buyer stages when supported by the query wording.
+
 Allowed source roles are `site-product`, `site-service`, `industry-context`,
 `standard-regulation`, and `application-context`. If no credible external source exists, keep the
 same-site evidence and explain the search limitation in `external_source_reason`. Replace every
 `YYYY-MM-DD` placeholder with the actual access date.
+
+Select 2–4 `related_keywords` from the related-query and source evidence before drafting. Each must
+be a natural English phrase of 2–8 words, remain within the selected primary intent, and add a
+distinct supporting concept. A related keyword must not equal, contain, or be contained by the
+exact core keyword or another selected related keyword; this prevents one occurrence from
+artificially satisfying multiple counters.
 
 For originality:
 
@@ -94,8 +137,12 @@ For originality:
 ## Required fields
 
 - `title` is the page H1 and must equal `seo_title1`.
-- Use natural professional English, include the exact core keyword naturally, use Title Case, and
-  stay within 100 English characters. Prefer 80 or fewer for WUZHICMS compatibility.
+- Use natural professional English, include the exact core keyword exactly once as a grammatical
+  part of the title sentence, use Title Case, and stay within 100 English characters. Prefer 80 or
+  fewer for WUZHICMS compatibility.
+- Do not write `<keyword>: <subtitle>`, `<keyword> - <subtitle>`, or a bare keyword followed by a
+  separator. Add at least three meaningful content words around the keyword and connect it to a
+  verb, question, comparison, decision, process, risk, or outcome.
 - Do not put the `目标国家` or `目标客户` value—or a translation, country adjective/demonym, country
   code, region label, customer segment, buyer role, or close paraphrase—into `title` or
   `seo_title1`. Reject templates such as `<keyword> for <customer>`,
@@ -111,6 +158,20 @@ For originality:
 ## Title diversity
 
 Base the title on researched product evidence and search intent, not on spreadsheet audience fields.
+Before drafting, run:
+
+```bash
+python scripts/select_title_mode.py \
+  --seed "<run-id>|<tab>|<sheet-row-number>|<exact-core-keyword>" \
+  --output <row-run-dir>/title-mode.json
+```
+
+Create the seed from values fixed before title drafting and never redraw or alter it after seeing
+the result. A roll from 0 through 69 requires one question mark at the end of a genuine question; a
+roll from 70 through 99 requires a statement title with no question mark. This produces an
+auditable 70% question-title probability across jobs. Record the seed, roll, and `title_mode` in the
+row manifest.
+
 Select exactly one angle:
 
 - `product-education`
@@ -137,11 +198,23 @@ Select exactly one pattern:
 - `risk-led`
 - `benefit-led`
 
-Use the least-used available angles and patterns in the current run. Rotate through every value in
-each set once before starting another cycle; never repeat an angle or pattern on consecutive
+For question mode, use any pattern except `direct-statement`. For statement mode, use any pattern
+except `question`; `how-to` may be a declarative “How to…” title without a question mark. Treat mode
+and pattern as separate fields so the 70% question requirement still permits varied how, which,
+why, process, comparison, risk, benefit, numbered, and decision structures.
+
+Use the least-used compatible angles and patterns in the current run. Rotate through every
+compatible value before starting another cycle; never repeat an angle or pattern on consecutive
 current-run titles, and never reuse the same angle-pattern pair within one run. Rotate openings,
 syntax, and value propositions; do not repeatedly start with “How to Choose,” “Ultimate Guide,”
 “Best,” “Top,” or “Complete Guide.” Country/customer substitution does not count as diversity.
+
+Write every title in a neutral third-person editorial voice. Do not use “we,” “our,” unsupported
+superlatives, or a formula that presents the host company as the inevitable answer. For a keyword
+that explicitly requests “top N,” “best,” “leading,” or a manufacturer list, disclose objective
+inclusion criteria and the evidence date in the article. Prefer alphabetical, categorical, or
+otherwise non-ranked ordering unless comparable evidence supports each rank. Evaluate the host
+company under the same criteria as every other named company.
 
 Before validation, create `title-history.json` containing accepted titles from earlier tabs in the
 run and up to 20 recent titles from the current site when available. Exclude the current draft.
@@ -150,10 +223,12 @@ Use this shape:
 ```json
 [
   {
-    "title": "How Material Grade Changes Product Performance",
+    "title": "How Does Material Grade Change Product Performance?",
     "keyword": "material grade",
     "angle": "feature-analysis",
     "pattern": "technical-explainer",
+    "mode": "question",
+    "question_roll": 24,
     "source": "current-run",
     "tab": "www.example.com"
   },
@@ -173,6 +248,20 @@ angle-pattern pair, a normalized title-template similarity of 0.82 or higher, or
 content-word overlap of 0.75 or higher with at least three shared words. Rewrite the title around a
 different researched angle instead of swapping only the country, customer, adjective, or year.
 
+## Neutral editorial treatment
+
+- Write from the buyer's decision perspective in third person. Replace “we,” “our product,” and
+  “our factory” with the verified company, product, or facility name.
+- Present advantages together with operating conditions and limitations. For comparisons, apply the
+  same dimensions and evidence standard to every material, solution, or supplier.
+- For “top N manufacturers” or similar list content, state the inclusion criteria, evidence date,
+  geographic or product scope, and limitations. Do not imply that inclusion is an audited rank.
+- Use alphabetical, categorical, or evidence-based ordering. Assign numbered ranks only when
+  current comparable data supports each position; otherwise describe the list as a shortlist.
+- Do not automatically place the host company first. Evaluate it under the same criteria, distinguish
+  same-site claims from independently verifiable facts, and omit any company lacking sufficient
+  evidence rather than filling a target count with invented claims.
+
 ## HTML structure
 
 Use this order:
@@ -181,7 +270,7 @@ Use this order:
    `assets/article-content-style.html`.
 2. Open one `<article class="article-content">` wrapper.
 3. Add one lead `<p>` that directly answers the primary question.
-4. Add four to eight H2 sections, with H3 only beneath an H2.
+4. Add five to nine H2 sections and deepen multiple non-FAQ H2 sections with H3 subheadings.
 5. Add one FAQ H2 with four to six non-duplicative questions and self-contained answers.
 6. Apply the intent-driven ending rules below, then close `</article>`.
 
@@ -200,27 +289,59 @@ Do not generate a table of contents, anchor directory, or `<nav class="article-t
 - Do not add breadcrumbs, author/date/read-count/rating blocks, hidden text, hidden links, or
   manipulative AI instructions.
 
+### Non-FAQ H3 depth
+
+Use H3s to develop the existing H2 argument, not to add a second search intent or inflate the
+outline. FAQ question H3s never count toward the body-depth requirement.
+
+| Visible article length | Minimum non-FAQ H3s | Minimum non-FAQ H2 sections containing H3s |
+| --- | --- | --- |
+| 10,000–11,999 characters | 6 | the greater of 3 or half of non-FAQ H2s, rounded up |
+| 12,000–13,499 characters | 7 | the greater of 4 or half of non-FAQ H2s, rounded up |
+| 13,500–15,000 characters | 8 | the greater of 4 or half of non-FAQ H2s, rounded up |
+
+Cap the required parent-section count at the number of available non-FAQ H2s. Require at least one
+more body H3 than the minimum parent-section count so at least one important H2 receives a genuine
+two-part analysis. Use at most 10 non-FAQ H3s and no more than twice the number of non-FAQ H2s; the
+validator applies the lower of those two limits.
+
+- Make every H3 unique, descriptive, and specific to its parent H2. Avoid labels such as
+  “Overview,” “Key Factors,” “More Details,” or “Things to Consider” when the heading does not name
+  the actual factor, test, material, decision, or limitation.
+- Follow every non-FAQ H3 with at least one paragraph, list item, table cell, or caption and at least
+  180 visible characters before the next H3 or H2. A heading followed only by an image, placeholder,
+  or one-line restatement is not developed content.
+- Start the subsection with a direct answer or finding, then add the evidence, operating condition,
+  comparison basis, limitation, or buyer implication that makes the subsection independently useful.
+- Keep H3s within the same primary search intent. Do not fragment one paragraph into artificial
+  headings, duplicate the parent H2 wording, or give every H2 the same repeated subheading pattern.
+
 ## Intent-driven ending
 
 Choose and record exactly one `ending_mode`:
 
-| Search intent | Allowed ending modes | Default |
+| Buyer stage | Allowed ending modes | Default |
 | --- | --- | --- |
-| `product-education`, `feature-application`, `comparison`, `specifications`, `problem-solving` | `informational-close`, `inline-cta` | `informational-close` |
-| `supplier-manufacturer-discovery`, `oem-odm`, `purchasing-advice`, `quotation-customization` | `inline-cta`, `standalone-cta` | `inline-cta` |
+| `awareness` | `informational-close` | `informational-close` |
+| `consideration` | `informational-close`, `inline-cta` | `informational-close` |
+| `evaluation` | `informational-close`, `inline-cta` | `inline-cta` when a next verification step is useful |
+| `inquiry` | `inline-cta`, `standalone-cta` | `inline-cta` |
 
 - `informational-close`: End with a useful synthesis, limitation, decision criterion, or next
   technical step. Do not add a CTA marker or force a contact link.
 - `inline-cta`: Add one short, article-specific final paragraph marked exactly
   `<p data-article-cta="inline">...</p>`. Integrate it after the final useful content; do not create
   a CTA-only H2.
-- `standalone-cta`: Use only for a commercial intent when the ending adds substantive RFQ,
+- `standalone-cta`: Use only at the `inquiry` stage for `product-selection`, `oem-odm`, or
+  `supplier-evaluation` when the ending adds substantive RFQ,
   specification, sample, testing, packaging, or quotation guidance. Wrap it exactly in
   `<section data-article-cta="standalone">...</section>`. Do not use it merely to repeat a contact
   link.
 
-Prefer the default mode. A contact link is optional for informational intent and expected only when
-it directly advances the commercial task. Base every CTA on services confirmed on the site.
+Prefer the default mode. `foundational-knowledge` always uses `informational-close`, even at the
+consideration stage. An awareness article must not ask for a quote, sample, or customization request
+in the lead or ending. A contact link is optional outside inquiry and appropriate only when it
+directly advances the buyer's current task. Base every CTA on services confirmed on the site.
 
 Do not:
 
@@ -337,22 +458,35 @@ color is not directly observed, explain its relationship to the observed palette
 `derivation_notes`. Do not select colors from a product label, third-party widget, advertisement,
 photograph, or competitor site.
 
-## Lead and internal links
+## Lead, keyword distribution, and internal links
 
 - Place the core keyword naturally near the beginning of the lead.
 - Link the first occurrence of the core keyword to a real, relevant page on the same site.
+- Use the exact core keyword 3–5 times in visible `content.html` copy. The linked lead occurrence
+  counts as the first use. Distribute the phrase across the lead and at least two later content
+  blocks; never use it more than once in the same paragraph, heading, list item, table cell, or
+  caption. A heading occurrence is optional and must not be a mechanical prefix.
+- Use every selected related keyword 1–2 times. Keep all selected related keywords at 3–5 visible
+  occurrences in total and distribute them across at least two content blocks. Prefer a useful
+  technical, comparison, application, or purchasing sentence over a standalone keyword sentence.
+- Count only reader-visible text inside `.article-content`: headings, paragraphs, list items,
+  table cells, and captions. Do not count or manipulate `title`, `seo_title1`, `remark`, `seo_desc`,
+  CSS, HTML attributes, anchor URLs, image alt text, hidden text, or page chrome. Do not use a
+  plural/singular rewrite as an exact occurrence unless it exactly matches the recorded phrase.
 - Use only verified same-site HTTPS links. Never invent a URL or substitute a competitor.
-- Add one or two relevant internal links per 2,000 visible English characters: normally 3–5 links
-  for a 5,000-character article and 5–10 for a 10,000-character article.
+- Add one or two relevant internal links per 2,000 visible English characters: normally 5–10 links
+  for a 10,000-character article and 8–15 for a 15,000-character article.
 - Use descriptive, non-repeated anchor text; do not use “Click Here” or “Read More”.
 
 ## Length and GEO quality
 
-- Keep final visible English content between 5,000 and 10,000 characters, including spaces and
-  punctuation in headings, paragraphs, lists, tables, FAQ, and any CTA that is present.
+- Target 12,000–13,500 visible English characters. Require the final article to remain between
+  10,000 and 15,000 characters, including spaces and punctuation in headings, paragraphs, lists,
+  tables, FAQ, and any CTA that is present.
 - Exclude HTML tags, anchors, image paths, SEO fields, and page chrome from the count.
 - Prefer independently understandable answers, complete product/material names, explicit
-  comparison conditions, and consistent facts. Do not pad or mechanically repeat keywords.
+  comparison conditions, and consistent facts. Meet keyword counts through relevant statements;
+  do not pad, cluster, or mechanically repeat phrases.
 
 ## Images
 
@@ -434,8 +568,7 @@ photograph, or competitor site.
   or service images as references whenever the site provides them. Use generic visual knowledge only
   when no relevant same-site visual exists.
 - Generate one 16:9 thumbnail and body images in 3:2 format.
-- Use 2 body images for 5,000–6,499 visible characters, 3 for 6,500–8,499, and 4 for
-  8,500–10,000.
+- Use 4 body images for 10,000–12,499 visible characters and 5 for 12,500–15,000.
 - Place repeated `[IMAGE_BASE64]` tokens at relevant locations in `content.html`, one per body
   image and in the same order as the upload list.
 - Provide a distinct, accurate English alt text for each body image. Describe visible content and
@@ -679,13 +812,18 @@ roles must be unique. If the only eligible product candidate is intentionally re
 
 ## Final checks
 
-Require exact field equality, valid heading hierarchy, no generated TOC, one scoped responsive style
-block, one `.article-content` wrapper, fixed pixel-based font sizes, responsive table wrappers,
+Require exact field equality, valid heading hierarchy, length-adjusted non-FAQ H3 depth across
+multiple body sections, no generated TOC, one scoped responsive style block, one
+`.article-content` wrapper, fixed pixel-based font sizes, responsive table wrappers,
 same-site theme evidence, exact palette-to-CSS equality, accessible site-themed font and table
 colors, natural spacing, the configured visible-character range, verified internal links, the
 correct placeholder/image count, distinct alt text, four to six FAQs, inspected same-site visual
 references, a deduplicated global image pool, unique source assignment and article roles,
 perceptually distinct final images, no target-country/customer title modifiers, a unique
-title angle-pattern pair,
-sufficient title diversity, one keyword-led search intent, current documented research, a varied
-evidence-led outline, an intent-appropriate non-boilerplate ending, and no unsupported claims.
+title angle-pattern pair, a valid seeded 70/30 title mode, one naturally integrated title keyword,
+neutral title and article wording, sufficient title diversity, one primary intent from the
+seven-type taxonomy, no more than one subordinate secondary intent, a compatible buyer stage,
+current documented research, a varied evidence-led outline, 10,000–15,000 visible characters with
+a 12,000–13,500 target, 3–5 distributed exact core-keyword occurrences, 2–4 distinct related
+keywords with 3–5 combined distributed occurrences, a buyer-stage-appropriate non-boilerplate
+ending, and no unsupported claims.
