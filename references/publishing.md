@@ -34,9 +34,32 @@ Never write the publishing key to a local file, log, command argument, or respon
 
 ## Endpoint and payload
 
-Build the endpoint from the tab host:
+Pass the exact bare Sheet tab domain as required `--site-host`; the publisher constructs:
 
 `https://<tab-host>/index.php?m=autocreate&f=index&v=autocreate`
+
+Run `python3 scripts/publish_article.py --site-host TAB_HOST --check-endpoint` during preflight.
+Record its canonical `endpoint` in the row manifest and use the same `--site-host` for dry-run
+and live submission. `--check-endpoint` does not read article files, request credentials, or send
+HTTP. For live reachability preflight, make a credential-free GET to the returned URL with
+redirects disabled and require HTTP 405 (the API is POST-only). A redirect, HTML error, or another
+status does not satisfy this check; do not substitute another module or perform a test POST.
+
+`--endpoint` is optional and serves only as an assertion, not a free-form routing override.
+When supplied, quote the entire URL in shell commands. The script requires:
+
+- HTTPS on the standard port and an exact match to `--site-host` (no implicit `www` alias).
+- Exactly `/index.php` and exactly one each of `m=autocreate`, `f=index`, and `v=autocreate`.
+  Parameter order may vary and is normalized; duplicate, extra, missing, empty, or encoded
+  parameters are rejected, including `m=seo_article`.
+- No URL credentials, fragment, whitespace, control characters, backslash, or path parameters.
+
+An invalid route fails before reading files or credentials and before creating an HTTP session.
+`--dry-run` checks the route and local payload but does not prove server reachability or permission
+to publish. `--allow-http-localhost` permits HTTP and a test port only for `localhost` or
+`127.0.0.1`; it never relaxes the host, path, or route checks. POST redirects are disabled to avoid
+forwarding credentials or replaying a multipart request at another route. A redirect is a failure
+requiring inspection under the existing retry rules, not an automatic second request.
 
 Use an HTTPS multipart POST with:
 

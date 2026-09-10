@@ -7,11 +7,12 @@ import argparse
 import getpass
 import json
 import os
+import re
 import sys
 import warnings
 from contextlib import ExitStack
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
 warnings.filterwarnings("ignore", message=r"urllib3 v2 only supports OpenSSL.*")
 
@@ -20,6 +21,9 @@ from PIL import Image
 
 
 PLACEHOLDER = "[IMAGE_BASE64]"
+PUBLISH_PATH = "/index.php"
+PUBLISH_QUERY = "m=autocreate&f=index&v=autocreate"
+LOCAL_TEST_HOSTS = {"127.0.0.1", "localhost"}
 
 
 def read_text(path: Path) -> str:
@@ -47,25 +51,80 @@ def validate_webp(path: Path) -> dict[str, object]:
     }
 
 
-def validate_endpoint(endpoint: str, allow_http_localhost: bool) -> None:
-    parsed = urlparse(endpoint)
+def validate_site_host(site_host: str) -> str:
+    """Accept only a bare Sheet tab host, without URL components or a port."""
+    host = site_host.lower()
+    labels = host.split(".")
+    if not site_host.isascii() or len(host) > 253 or not all(
+        re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+        for label in labels
+    ):
+        raise ValueError("Site host must be the bare domain from the selected Sheet tab")
+    return host
+
+
+def build_endpoint(site_host: str) -> str:
+    return f"https://{validate_site_host(site_host)}{PUBLISH_PATH}?{PUBLISH_QUERY}"
+
+
+def validate_endpoint(
+    endpoint: str, allow_http_localhost: bool, site_host: str
+) -> str:
+    """Fail closed on a wrong route or host; return the canonical validated URL."""
+    expected_host = validate_site_host(site_host)
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in endpoint):
+        raise ValueError("Endpoint must not contain whitespace or control characters")
+    if "\\" in endpoint:
+        raise ValueError("Endpoint must not contain backslashes")
+    parsed = urlsplit(endpoint)
     host = (parsed.hostname or "").lower()
-    if parsed.scheme == "https" and host:
-        return
-    if allow_http_localhost and parsed.scheme == "http" and host in {"127.0.0.1", "localhost"}:
-        return
-    raise ValueError("Endpoint must use HTTPS")
+    if parsed.username is not None or parsed.password is not None or "#" in endpoint:
+        raise ValueError("Endpoint must not contain credentials or a fragment")
+    if host != expected_host:
+        raise ValueError("Endpoint host must exactly match --site-host from the selected Sheet tab")
+    local_http = (
+        allow_http_localhost and parsed.scheme == "http" and host in LOCAL_TEST_HOSTS
+    )
+    if parsed.scheme != "https" and not local_http:
+        raise ValueError("Endpoint must use HTTPS; HTTP is allowed only for explicit localhost tests")
+    if not re.fullmatch(r"[A-Za-z0-9.-]+(?::[0-9]+)?", parsed.netloc):
+        raise ValueError("Endpoint authority must contain only the host and an optional numeric port")
+    port = parsed.port
+    if local_http:
+        if port is not None and port < 1:
+            raise ValueError("Local test endpoint port must be between 1 and 65535")
+    elif port not in {None, 443}:
+        raise ValueError("Production endpoint must use the standard HTTPS port 443")
+    if parsed.path != PUBLISH_PATH:
+        raise ValueError(f"Publishing endpoint path must be exactly {PUBLISH_PATH}")
+    # Compare raw tokens, not a dict: duplicates, encoded aliases and extra keys
+    # must not be collapsed or decoded into an apparently valid route.
+    if sorted(parsed.query.split("&")) != sorted(PUBLISH_QUERY.split("&")):
+        raise ValueError(
+            f"Publishing route must contain exactly {PUBLISH_QUERY}, each parameter once"
+        )
+    authority = expected_host
+    if local_http and port is not None:
+        authority += f":{port}"
+    return f"{parsed.scheme}://{authority}{PUBLISH_PATH}?{PUBLISH_QUERY}"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--endpoint", required=True)
-    parser.add_argument("--title-file", type=Path, required=True)
-    parser.add_argument("--seo-title-file", type=Path, required=True)
-    parser.add_argument("--remark-file", type=Path, required=True)
-    parser.add_argument("--seo-desc-file", type=Path, required=True)
-    parser.add_argument("--content-file", type=Path, required=True)
-    parser.add_argument("--thumb", type=Path, required=True)
+    parser.add_argument(
+        "--site-host", required=True,
+        help="Exact bare domain from the selected Sheet tab",
+    )
+    parser.add_argument(
+        "--endpoint",
+        help="Optional URL assertion; defaults to the fixed route for --site-host",
+    )
+    parser.add_argument("--title-file", type=Path)
+    parser.add_argument("--seo-title-file", type=Path)
+    parser.add_argument("--remark-file", type=Path)
+    parser.add_argument("--seo-desc-file", type=Path)
+    parser.add_argument("--content-file", type=Path)
+    parser.add_argument("--thumb", type=Path)
     parser.add_argument("--content-image", type=Path, action="append", default=[])
     parser.add_argument("--content-image-alt", action="append", default=[])
     parser.add_argument(
@@ -73,14 +132,46 @@ def parse_args() -> argparse.Namespace:
         default="SEO_GEO_ARTICLE_WEBKEY",
         help="Read the publishing key from this environment variable; otherwise prompt securely",
     )
-    parser.add_argument("--dry-run", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--dry-run", action="store_true",
+        help="Validate local route and payload only; no HTTP request",
+    )
+    mode.add_argument(
+        "--check-endpoint", action="store_true",
+        help="Validate and print the route only; no files, key, or HTTP request",
+    )
     parser.add_argument("--allow-http-localhost", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.check_endpoint:
+        required_files = (
+            "title_file", "seo_title_file", "remark_file", "seo_desc_file", "content_file", "thumb",
+        )
+        missing = [
+            "--" + name.replace("_", "-")
+            for name in required_files if getattr(args, name) is None
+        ]
+        if missing:
+            parser.error("the following arguments are required: " + ", ".join(missing))
+    return args
 
 
 def main() -> int:
     args = parse_args()
-    validate_endpoint(args.endpoint, args.allow_http_localhost)
+    endpoint = validate_endpoint(
+        args.endpoint if args.endpoint is not None else build_endpoint(args.site_host),
+        args.allow_http_localhost,
+        args.site_host,
+    )
+    if args.check_endpoint:
+        print(json.dumps({
+            "valid": True,
+            "site_host": validate_site_host(args.site_host),
+            "endpoint": endpoint,
+            "validation_scope": "local-route-only",
+            "network_request_sent": False,
+        }, ensure_ascii=False, indent=2))
+        return 0
     title = read_text(args.title_file)
     seo_title = read_text(args.seo_title_file)
     remark = read_text(args.remark_file)
@@ -103,7 +194,8 @@ def main() -> int:
     }
     result: dict[str, object] = {
         "dry_run": args.dry_run,
-        "endpoint": args.endpoint,
+        "endpoint": endpoint,
+        "route_validation": "passed",
         "fields": {
             "title_characters": len(title),
             "seo_title_characters": len(seo_title),
@@ -142,21 +234,27 @@ def main() -> int:
             handle = stack.enter_context(path.open("rb"))
             files.append(("content_img[]", (path.name, handle, "image/webp")))
         session = stack.enter_context(requests.Session())
-        if (urlparse(args.endpoint).hostname or "").lower() in {"127.0.0.1", "localhost"}:
+        if (urlsplit(endpoint).hostname or "").lower() in LOCAL_TEST_HOSTS:
             session.trust_env = False
         try:
             response = session.post(
-                args.endpoint,
+                endpoint,
                 headers=headers,
                 data=data,
                 files=files,
                 timeout=(15, 120),
+                allow_redirects=False,
             )
         except (requests.ConnectionError, requests.Timeout) as exc:
             raise RuntimeError(
                 "Publish request outcome is unknown; inspect the site before any retry"
             ) from exc
 
+    if 300 <= response.status_code < 400:
+        raise RuntimeError(
+            f"Publishing endpoint returned HTTP {response.status_code}; redirect not followed. "
+            "Inspect the site and Sheet before any retry"
+        )
     try:
         payload = response.json()
     except ValueError as exc:

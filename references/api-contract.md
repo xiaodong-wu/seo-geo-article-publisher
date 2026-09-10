@@ -6,6 +6,11 @@ Send `multipart/form-data` to:
 
 `https://<site>/index.php?m=autocreate&f=index&v=autocreate`
 
+Use `scripts/publish_article.py --site-host <site>` to construct this route. The script rejects
+wrong hosts, paths, missing/duplicate/extra route parameters, and POST redirects before they can
+be used as alternate publishing destinations. See `publishing.md` for the local route check,
+live reachability preflight, and localhost-only test exception.
+
 Required header:
 
 `Authorization: Bearer <webkey>`

@@ -27,7 +27,10 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      in `references/publishing.md`.
    - Confirm Google Sheets read/write access, image generation, network access, and a writable run
      directory outside this skill.
-   - For a live run, confirm each selected domain serves HTTPS and its publishing endpoint exists.
+   - Run `python3 scripts/publish_article.py --site-host TAB_HOST --check-endpoint` and record
+     the returned canonical `endpoint` in the row manifest. This is a local route check only.
+     For a live run, confirm HTTPS and check that exact endpoint as described in
+     `references/publishing.md`; retain the same tab host and endpoint through submission.
 
 2. **Select and claim work**
    - Process every visible site tab in order.
@@ -282,8 +285,12 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
    - Require a clean validation result before any API call.
 
 6. **Publish and verify**
-   - Run `scripts/publish_article.py`; enter the row's publishing key through its hidden prompt or a
-     pre-existing environment variable. Never put the key in a command argument.
+   - Run `scripts/publish_article.py --site-host TAB_HOST`; it generates the fixed publishing
+     route. An optional quoted `--endpoint` must pass exact host/path/parameter validation;
+     never infer a module name. Local route validation runs before files, credentials, or HTTP
+     in both dry-run and live modes. POST redirects are rejected, not followed.
+   - Enter the row's publishing key through the hidden prompt or a pre-existing environment
+     variable. Never put the key in a command argument.
    - Upload `thumb` plus ordered `content_img[]` WebP files and matching `content_img_alt[]` values.
    - After API success, run `scripts/verify_article.py` with the returned article URL, recorded
      `article_listing_url`, returned thumbnail path, returned content-image paths, and
@@ -332,7 +339,8 @@ python scripts/validate_article.py --title-file FILE --seo-title-file FILE \
   --intent-analysis-file FILE --site-host HOST \
   --theme-colors-file FILE --content-images N --alt-text-file FILE \
   --image-reference-file FILE
-python scripts/publish_article.py --endpoint URL --title-file FILE --seo-title-file FILE \
+python3 scripts/publish_article.py --site-host TAB_HOST --check-endpoint
+python3 scripts/publish_article.py --site-host TAB_HOST --title-file FILE --seo-title-file FILE \
   --remark-file FILE --seo-desc-file FILE --content-file FILE --thumb FILE \
   --content-image FILE --content-image-alt TEXT [--content-image FILE ...] [--dry-run]
 python scripts/verify_article.py --url ARTICLE_URL --listing-url LISTING_URL \
