@@ -19,9 +19,13 @@ It combines keyword-led search-intent research, title and outline diversity, sit
   phrase words and distributed naturally across the visible article content.
 - Prevents target-country and target-customer fields from becoming repetitive title templates.
 - Matches article typography and table colors to each site's observed theme.
+- Searches all same-site product lists, categories, pagination, and sitemaps for relevant products,
+  including synonyms and related product families, and records catalogue coverage.
 - Builds and deduplicates a same-site image candidate pool before assigning image slots.
 - Requires different source images and article roles unless only one valid product source exists.
-- Locks original branding, labels, packaging colors, and product geometry during whole-image regeneration.
+- Preserves original product identity during whole-image regeneration; thumbnails may have
+  documented minor cosmetic differences while branding, labels, specifications, and critical
+  structure remain accurate. Body images retain strict preservation.
 - Validates content structure, length, FAQ count, links, theme contrast, image diversity, and product-identity evidence.
 - Publishes through a multipart WUZHICMS endpoint, checks body images on the article detail page,
   and verifies the thumbnail asset plus its appearance on the article listing page.
@@ -37,6 +41,7 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 ├── references/
 │   ├── api-contract.md
 │   ├── content-spec.md
+│   ├── product-discovery.md
 │   └── publishing.md
 ├── scripts/
     ├── analyze_image_pool.py

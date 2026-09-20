@@ -500,11 +500,14 @@ photograph, or competitor site.
 
 ## Images
 
+- Discover relevant products across the whole site following
+  [product-discovery.md](product-discovery.md), including every product list and pagination page.
+  The supplied product/category URL and an exact keyword match do not limit eligible sources.
 - Create every final image from visual references taken from the same site and record the exact
   reference page and image URLs in the manifest.
 - Build and deduplicate a global candidate pool before assigning the thumbnail or any body slot.
-  Prefer 3–8 retained candidates for the article: exact-product views from the product gallery or
-  category plus section-relevant same-site factory, laboratory, application, production,
+  Prefer 3–8 retained candidates for the article: verified exact-product or relevant same-family
+  views discovered across the catalogue plus same-site factory, laboratory, application, production,
   packaging, warehouse, or service scenes. Candidate shortage is allowed only with a concrete
   `candidate_pool_limit_reason`. Do not introduce a different SKU, variant, product family, or
   brand merely to satisfy the preferred pool size.
@@ -534,7 +537,7 @@ photograph, or competitor site.
   truth takes priority over source diversity.
 - Classify each planned image as `product-present` or `non-product` before generation.
 - For every `product-present` image, download and inspect one to three original product images from
-  the related product/category pages. Prefer the highest-resolution front or three-quarter view
+  the relevant product/category pages found across the whole site. Prefer the highest-resolution front or three-quarter view
   that makes the actual brand, label, packaging, and product form verifiable.
 - Before generation, transcribe an identity inventory from those references: every visible brand
   or logo word, the product/variant name and other legible label text, package colors/materials,
@@ -560,20 +563,18 @@ photograph, or competitor site.
   `locked_product_file` and `lock_mask_file` in `referenced_image_paths`, and omit
   `num_last_images_to_include`. Do not perform a text-only generation and do not substitute a
   recently generated image for either required local lock input.
-- Treat the locked product as a non-editable identity object. Whole-object proportional scaling and
-  translation are allowed when needed for composition, but the model must not alter the product
-  interior, outline, front-facing label, packaging, accessories, or visible product form. Save the
-  raw whole-image generation before WebP encoding. If the model changes the locked object, discard
-  the result; a prompt instruction is not proof of preservation.
-- Preserve the exact logo, brand name, label text, typography, label layout, package colors,
-  material, reflections, container/roll shape, closure, proportions, and visible product form.
-  Do not remove, rewrite, approximate, hallucinate, blur, hide, turn away, crop, or replace them.
-  A visually similar blank or generic package is a failed output.
-- If a regenerated image changes even one visible brand letter, label word, packaging color, or
-  product-shape detail, retry whole-image regeneration with the extracted product and inspected
-  lock mask. If exact identity still cannot be retained, fail the image and row. Do not fall back
-  to deterministic compositing, a background-only edit, the unchanged source, or a `contain`-only
-  canvas. Never trade product identity for a more cinematic scene.
+- In generation prompts, aim to preserve the complete locked product, including its logo, brand,
+  label text/layout, colors, materials, outline, closures, proportions, reflections, and visible
+  form. Whole-object proportional scaling and translation are allowed for composition. Save the
+  raw whole-image generation before WebP encoding and judge the actual result, not the prompt.
+- Apply **Thumbnail acceptance** below to thumbnails. For body images, retain strict preservation:
+  reject changed product details or altered brand/label text. For all images, reject a substituted
+  or generic product, changed brand/model/specifications, invented claims, or missing critical
+  components. A minor-difference disclosure cannot make a materially different product acceptable.
+- Retry a rejected result with the extracted product and inspected mask. If no result meets the
+  applicable slot criteria, fail the image and row. An acceptable thumbnail with documented minor
+  differences needs no retry. Do not fall back to deterministic compositing, a background-only
+  edit, the unchanged source, or a `contain`-only canvas.
 - For `non-product` images, use same-site factory, laboratory, application, production, warehouse,
   or service images as references whenever the site provides them. Use generic visual knowledge only
   when no relevant same-site visual exists.
@@ -583,9 +584,8 @@ photograph, or competitor site.
   image and in the same order as the upload list.
 - Provide a distinct, accurate English alt text for each body image. Describe visible content and
   purpose; use the core or related keyword only when natural.
-- Inspect every generated image at full size. Reject and regenerate a `product-present` image when
-  any product detail is missing or changed, any brand/label character differs, or the source product
-  is replaced by generic packaging. Reject invented certifications, performance claims, contact
+- Inspect every generated image at full size using the slot-specific criteria. Reject changed
+  brand/label text or generic replacement packaging. Reject invented certifications, performance claims, contact
   details, third-party branding, or a misleading factory/product context.
 - Load the source reference, extracted locked product, raw whole-image generation, and final WebP
   with `view_image` (or an equivalent original-detail viewer), and compare all four side by side at
@@ -606,6 +606,58 @@ photograph, or competitor site.
   If the single-product-source exception is used, the two outputs derived from that source must be
   at least 12 bits apart. A palette shift, crop, flipped canvas, or background-only variation does
   not count as meaningful diversity.
+
+### Thumbnail acceptance
+
+A thumbnail may be used when differences are small and the original product remains clearly
+recognizable. This exception applies only to the thumbnail, not body images or the alpha-only
+source extraction. Keep aiming for high fidelity during generation; do not fail or repeatedly
+regenerate a usable thumbnail solely for these minor differences:
+
+- `surface-lighting`: slight brightness, reflection, or shading differences that do not change the
+  product's identifiable color, material, or condition.
+- `surface-texture`: small texture or grille-mesh rendering differences without changing the
+  ventilation area, location, structure, or implied function.
+- `non-functional-detail`: tiny decorative, screw, or handle-finish differences while the actual
+  component, its count, placement, operating form, and function remain unchanged.
+- `slight-proportion`: small visual proportion differences that do not suggest a different model,
+  size class, capacity, or connection layout.
+
+Reject changed logo/brand letters, label words or numbers, model, ingredient, specification,
+certification or performance claims, a different product/variant, missing or added functional
+components, substantially different shape/colors, and obscured identifying text. Judge significance
+against the inspected source and product facts; do not invent a numeric similarity threshold or
+claim unseen details match. If unsure whether a change affects function or identity, retry or fail.
+
+For an accepted thumbnail with differences, use `pass-with-minor-differences` for
+`inspection_result`, each affected `identity_checks.packaging`/`product_geometry` check, and each
+affected `visual_inspection.locked_product_vs_generated`/`source_vs_final_webp` comparison. Other
+checks remain `pass` (or the existing `not-visible-in-reference` for absent source text).
+Brand/label checks and `source_vs_locked_product` never use the relaxed status. Add:
+
+```json
+{
+  "minor_difference_review": {
+    "severity": "minor",
+    "critical_identity_preserved": true,
+    "differences": [
+      {
+        "aspect": "surface-lighting",
+        "description": "Cabinet reflections are slightly brighter than the original."
+      }
+    ],
+    "acceptance_reason": "Brand, label text, product form and all functional components remain accurate.",
+    "disclosure": "缩略图柜体反光比原图略亮，属于轻微视觉差异，不影响产品识别。"
+  }
+}
+```
+
+Record every observed difference specifically; do not write only “close enough.” Recheck the final
+WebP and update the review if encoding changes the assessment. Copy the disclosure and acceptance
+reason into the per-site run manifest and the user-facing run result, with source/final image
+links. This is a run-result explanation, not an instruction to insert workflow details into article
+copy. Use ordinary `pass` with no review object when no differences are observed. The validator
+checks the record's consistency; visual inspection establishes whether the differences are minor.
 
 Use this product-preserving prompt structure for every `product-present` edit:
 
@@ -809,7 +861,9 @@ The `body` array must match placeholder/upload order. When product visuals exist
 at least one body image must be `product-present`. Set `site_has_branded_product_visuals` and
 `site_has_legible_product_labels` from the inspected site references. When either is true, both the
 thumbnail and at least one body record must contain the exact corresponding source-identity text and
-a passing check. When a capability is false, give a concrete corresponding reason. When no product
+a passing brand/label check. The thumbnail example shows exact preservation; for accepted minor
+differences, apply the statuses and `minor_difference_review` in **Thumbnail acceptance**. Body
+records remain strict. When a capability is false, give a concrete corresponding reason. When no product
 visual exists, set all three booleans to `false` and give `no_product_visual_reason`.
 
 The example abbreviates `selection_plan.slots`; the real file must contain exactly one slot in

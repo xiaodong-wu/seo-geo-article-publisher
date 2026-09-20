@@ -2278,6 +2278,63 @@ def validate_image_selection(
     )
 
 
+MINOR_DIFFERENCE_PASS = "pass-with-minor-differences"
+THUMBNAIL_MINOR_DIFFERENCE_ASPECTS = {
+    "surface-lighting",
+    "surface-texture",
+    "non-functional-detail",
+    "slight-proportion",
+}
+
+
+def validate_thumbnail_minor_differences(
+    label: str, record: dict[str, object]
+) -> tuple[bool, list[str]]:
+    """Validate a disclosed visual review; this is not automated pixel-fidelity proof."""
+    review = record.get("minor_difference_review")
+    result = normalize_space(str(record.get("inspection_result", ""))).lower()
+    statuses = [result]
+    for section in ("identity_checks", "visual_inspection"):
+        checks = record.get(section)
+        if isinstance(checks, dict):
+            statuses.extend(normalize_space(str(value)).lower() for value in checks.values())
+    if review is None and MINOR_DIFFERENCE_PASS not in statuses:
+        return False, []
+
+    errors: list[str] = []
+    if label != "thumbnail" or record.get("classification") != "product-present":
+        errors.append("Minor product differences are allowed only for a product-present thumbnail")
+    if result != MINOR_DIFFERENCE_PASS:
+        errors.append(f"{label} inspected minor differences require inspection_result {MINOR_DIFFERENCE_PASS}")
+    if not isinstance(review, dict):
+        errors.append(f"{label} minor_difference_review must be an object")
+        return False, errors
+    if review.get("severity") != "minor":
+        errors.append(f"{label} minor_difference_review.severity must be minor")
+    if review.get("critical_identity_preserved") is not True:
+        errors.append(f"{label} minor_difference_review.critical_identity_preserved must be true")
+    for field in ("acceptance_reason", "disclosure"):
+        value = review.get(field)
+        if not isinstance(value, str) or not normalize_space(value):
+            errors.append(f"{label} minor_difference_review.{field} must be a non-empty explanation")
+    differences = review.get("differences")
+    if not isinstance(differences, list) or not differences:
+        errors.append(f"{label} minor_difference_review.differences must describe observed changes")
+    else:
+        for index, difference in enumerate(differences):
+            prefix = f"{label} minor_difference_review.differences[{index}]"
+            if not isinstance(difference, dict):
+                errors.append(f"{prefix} must be an object")
+                continue
+            aspect = difference.get("aspect")
+            if not isinstance(aspect, str) or aspect not in THUMBNAIL_MINOR_DIFFERENCE_ASPECTS:
+                errors.append(f"{prefix}.aspect must be an allowed minor cosmetic difference")
+            description = difference.get("description")
+            if not isinstance(description, str) or not normalize_space(description):
+                errors.append(f"{prefix}.description must explain the observed difference")
+    return not errors, errors
+
+
 def validate_image_references(
     path: Path,
     host: str,
@@ -2383,6 +2440,13 @@ def validate_image_references(
         if not isinstance(record, dict):
             errors.append(f"{label} image reference record must be an object")
             continue
+        minor_differences_allowed, difference_errors = validate_thumbnail_minor_differences(
+            label, record
+        )
+        errors.extend(difference_errors)
+        accepted_visual_results = {"pass"}
+        if minor_differences_allowed:
+            accepted_visual_results.add(MINOR_DIFFERENCE_PASS)
         classification = normalize_space(str(record.get("classification", "")))
         if classification not in {"product-present", "non-product"}:
             errors.append(
@@ -2800,11 +2864,11 @@ def validate_image_references(
                 )
             elif label_check == "pass":
                 label_preserved_count += 1
-            if packaging_check != "pass":
-                errors.append(f"{label} identity_checks.packaging must be pass")
-            if geometry_check != "pass":
+            if packaging_check not in accepted_visual_results:
+                errors.append(f"{label} identity_checks.packaging must pass or have a valid thumbnail minor-difference review")
+            if geometry_check not in accepted_visual_results:
                 errors.append(
-                    f"{label} identity_checks.product_geometry must be pass"
+                    f"{label} identity_checks.product_geometry must pass or have a valid thumbnail minor-difference review"
                 )
 
             visual_inspection = record.get("visual_inspection")
@@ -2842,29 +2906,29 @@ def validate_image_references(
                         )
                     )
                 ).lower()
-                != "pass"
+                not in accepted_visual_results
             ):
                 errors.append(
                     f"{label} visual_inspection.locked_product_vs_generated "
-                    "must be pass"
+                    "must pass or have a valid thumbnail minor-difference review"
                 )
                 adaptation_is_valid = False
             if (
                 normalize_space(
                     str(visual_inspection.get("source_vs_final_webp", ""))
                 ).lower()
-                != "pass"
+                not in accepted_visual_results
             ):
                 errors.append(
-                    f"{label} visual_inspection.source_vs_final_webp must be pass"
+                    f"{label} visual_inspection.source_vs_final_webp must pass or have a valid thumbnail minor-difference review"
                 )
                 adaptation_is_valid = False
 
             if adaptation_is_valid:
                 whole_regenerated_product_count += 1
 
-        if normalize_space(str(record.get("inspection_result", ""))).lower() != "pass":
-            errors.append(f"{label} inspection_result must be pass")
+        if normalize_space(str(record.get("inspection_result", ""))).lower() not in accepted_visual_results:
+            errors.append(f"{label} inspection_result must pass or have a valid thumbnail minor-difference review")
 
     if site_has_product_visuals:
         if thumbnail.get("classification") != "product-present":

@@ -44,8 +44,13 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      article titles from the current site when available. Exclude the current draft title.
 
 3. **Research the site**
-   - Start from the related product URL and the tab domain. Inspect relevant product/category,
-     service, factory/about, application, contact, and sitemap pages as available.
+   - Treat the related product URL as a starting point, not the search boundary. Follow
+     [references/product-discovery.md](references/product-discovery.md) to inspect all same-site
+     product lists, categories, pagination, and product sitemaps. Search by the core keyword,
+     synonyms, product family, materials, and use case; open relevant or ambiguous product details.
+     Save coverage, matches, relevance reasons, and access gaps in `product-discovery.json` before
+     concluding that no suitable product or original image exists. Inspect relevant service,
+     factory/about, application, and contact pages for supporting context.
    - Identify the canonical same-site article listing page from the site's primary navigation or
      article archive. Require HTTPS, the same host as the site tab, HTTP 200, and evidence that the
      page lists recent articles. Save it as `article_listing_url` in the row manifest for
@@ -85,7 +90,7 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
    - Use only confirmed site facts and general industry knowledge. Record source URLs for claims,
      internal links, and image references in the manifest.
    - Build one global same-site candidate pool before selecting any image. Prefer 3–8 distinct
-     candidates across the related product gallery/category and relevant factory, application,
+     candidates across the relevant product galleries discovered throughout the site and factory, application,
      laboratory, production, packaging, warehouse, or service pages. Keep the highest-resolution
      product views that make the real product verifiable. Do not add a different SKU, variant, or
      brand merely to create visual variety.
@@ -213,16 +218,21 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
    - Call image generation as a referenced-image edit, passing both the local locked-product PNG and
      inspected mask as `referenced_image_paths`; omit `num_last_images_to_include`. A text-only
      generation or a call that omits the locked product is invalid.
-   - Treat the extracted product as a non-editable identity object during whole-image regeneration.
+   - Aim to preserve the extracted product as a non-editable identity object during regeneration.
      The model may reposition or proportionally scale the complete object only when needed for the
-     composition. It must not redraw, retype, restyle, blur, hide, crop, rotate, relight, recolor,
+     composition. In generation prompts, ask it not to redraw, retype, restyle, blur, hide, crop, rotate, relight, recolor,
      or substitute the product, logo, brand name, label text, package colors, container geometry,
      closure, proportions, reflections, accessories, or visible product form.
-   - Reject a regenerated image if image generation changes any brand letter, label word, typography,
-     package detail, package color, or product geometry. Retry whole-image regeneration using the
-     extracted product and lock mask as the identity constraint. If no regenerated result preserves
-     exact product identity, fail the image and row; do not fall back to deterministic compositing,
-     the unchanged source, or a `contain`-only output. Use same-site factory, application,
+   - Apply the thumbnail tolerance in `references/content-spec.md`: minor lighting, surface,
+     non-functional detail, or slight proportion differences may pass when product identity,
+     brand/label text, model/specifications, and critical structure remain accurate. Record
+     `pass-with-minor-differences` and a complete `minor_difference_review`; explain the concrete
+     differences and why they are acceptable in the run result. Do not retry an acceptable
+     thumbnail solely to eliminate minor differences. Body images retain strict preservation.
+   - Reject substantive product changes, changed brand/label text, or misleading specifications.
+     Retry with the source and mask; if the applicable image checks still fail, fail the image and
+     row. Do not fall back to deterministic compositing, the unchanged source, or a `contain`-only
+     output. Use same-site factory, application,
      laboratory, production, or service references for `non-product` images whenever available.
    - Target 12,000–13,500 visible characters and require 10,000–15,000. Create one thumbnail plus
      4 body images below 12,500 visible characters or 5 body images from 12,500–15,000. Do not
@@ -242,7 +252,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      final WebP and save body-image alt text in upload order. `--fit contain` is only a final
      anti-clipping safeguard for an already regenerated image; it never satisfies the regeneration
      requirement by itself. Reinspect the final WebP against the source before setting
-     `inspection_result` to `pass`. Reject final output pairs whose perceptual hashes are less than
+     `inspection_result` to `pass` or the documented thumbnail-only `pass-with-minor-differences`.
+     Reject final output pairs whose perceptual hashes are less than
      10 bits apart; when the one-source exception is used, require its two regenerated outputs to
      be at least 12 bits apart.
 
@@ -257,7 +268,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      theme-variable use for fonts and tables, and passing contrast checks. Also require structured
      same-site product-identity evidence, an extracted locked product and mask, auditable raw
      whole-image regeneration, and passing brand, label, packaging, geometry, and side-by-side
-     visual checks for every `product-present` image. Reject deterministic composites,
+     visual checks for every `product-present` image, including the documented thumbnail-only
+     minor-difference outcome. Brand/label and source-extraction checks remain strict. Reject deterministic composites,
      background-only edits, unchanged-source, and contain-only product outputs.
    - Require a 3–8-candidate global image plan unless a concrete shortage is documented. Require
      recorded source hashes, consolidation of exact/near duplicates, weighted whole-article slot
@@ -310,7 +322,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      access, invalid headers, or another systemic preflight failure.
    - Report each tab, source row, primary and optional secondary intent, buyer stage, title mode,
      ending mode, title angle, title pattern, final state, article URL, verification result, and
-     manifest path. Never report publishing keys.
+     manifest path. Include product-search coverage and any accepted thumbnail differences,
+     their acceptance reason, and source/final image evidence. Never report publishing keys.
 
 ## Failure rules
 
