@@ -2279,15 +2279,16 @@ def validate_image_selection(
 
 
 MINOR_DIFFERENCE_PASS = "pass-with-minor-differences"
-THUMBNAIL_MINOR_DIFFERENCE_ASPECTS = {
+PRODUCT_MINOR_DIFFERENCE_ASPECTS = {
     "surface-lighting",
     "surface-texture",
     "non-functional-detail",
     "slight-proportion",
+    "loose-material-arrangement",
 }
 
 
-def validate_thumbnail_minor_differences(
+def validate_product_minor_differences(
     label: str, record: dict[str, object]
 ) -> tuple[bool, list[str]]:
     """Validate a disclosed visual review; this is not automated pixel-fidelity proof."""
@@ -2302,8 +2303,9 @@ def validate_thumbnail_minor_differences(
         return False, []
 
     errors: list[str] = []
-    if label != "thumbnail" or record.get("classification") != "product-present":
-        errors.append("Minor product differences are allowed only for a product-present thumbnail")
+    is_body = re.fullmatch(r"body\[\d+\]", label) is not None
+    if (label != "thumbnail" and not is_body) or record.get("classification") != "product-present":
+        errors.append("Minor product differences are allowed only for a product-present thumbnail or body image")
     if result != MINOR_DIFFERENCE_PASS:
         errors.append(f"{label} inspected minor differences require inspection_result {MINOR_DIFFERENCE_PASS}")
     if not isinstance(review, dict):
@@ -2313,6 +2315,12 @@ def validate_thumbnail_minor_differences(
         errors.append(f"{label} minor_difference_review.severity must be minor")
     if review.get("critical_identity_preserved") is not True:
         errors.append(f"{label} minor_difference_review.critical_identity_preserved must be true")
+    if is_body:
+        context = review.get("section_context")
+        if not isinstance(context, str) or not normalize_space(context):
+            errors.append(f"{label} minor_difference_review.section_context must explain the image's role in its article section")
+        if review.get("section_claims_preserved") is not True:
+            errors.append(f"{label} minor_difference_review.section_claims_preserved must be true")
     for field in ("acceptance_reason", "disclosure"):
         value = review.get(field)
         if not isinstance(value, str) or not normalize_space(value):
@@ -2327,7 +2335,7 @@ def validate_thumbnail_minor_differences(
                 errors.append(f"{prefix} must be an object")
                 continue
             aspect = difference.get("aspect")
-            if not isinstance(aspect, str) or aspect not in THUMBNAIL_MINOR_DIFFERENCE_ASPECTS:
+            if not isinstance(aspect, str) or aspect not in PRODUCT_MINOR_DIFFERENCE_ASPECTS:
                 errors.append(f"{prefix}.aspect must be an allowed minor cosmetic difference")
             description = difference.get("description")
             if not isinstance(description, str) or not normalize_space(description):
@@ -2440,7 +2448,7 @@ def validate_image_references(
         if not isinstance(record, dict):
             errors.append(f"{label} image reference record must be an object")
             continue
-        minor_differences_allowed, difference_errors = validate_thumbnail_minor_differences(
+        minor_differences_allowed, difference_errors = validate_product_minor_differences(
             label, record
         )
         errors.extend(difference_errors)
@@ -2865,10 +2873,10 @@ def validate_image_references(
             elif label_check == "pass":
                 label_preserved_count += 1
             if packaging_check not in accepted_visual_results:
-                errors.append(f"{label} identity_checks.packaging must pass or have a valid thumbnail minor-difference review")
+                errors.append(f"{label} identity_checks.packaging must pass or have a valid product-image minor-difference review")
             if geometry_check not in accepted_visual_results:
                 errors.append(
-                    f"{label} identity_checks.product_geometry must pass or have a valid thumbnail minor-difference review"
+                    f"{label} identity_checks.product_geometry must pass or have a valid product-image minor-difference review"
                 )
 
             visual_inspection = record.get("visual_inspection")
@@ -2910,7 +2918,7 @@ def validate_image_references(
             ):
                 errors.append(
                     f"{label} visual_inspection.locked_product_vs_generated "
-                    "must pass or have a valid thumbnail minor-difference review"
+                    "must pass or have a valid product-image minor-difference review"
                 )
                 adaptation_is_valid = False
             if (
@@ -2920,7 +2928,7 @@ def validate_image_references(
                 not in accepted_visual_results
             ):
                 errors.append(
-                    f"{label} visual_inspection.source_vs_final_webp must pass or have a valid thumbnail minor-difference review"
+                    f"{label} visual_inspection.source_vs_final_webp must pass or have a valid product-image minor-difference review"
                 )
                 adaptation_is_valid = False
 
@@ -2928,7 +2936,7 @@ def validate_image_references(
                 whole_regenerated_product_count += 1
 
         if normalize_space(str(record.get("inspection_result", ""))).lower() not in accepted_visual_results:
-            errors.append(f"{label} inspection_result must pass or have a valid thumbnail minor-difference review")
+            errors.append(f"{label} inspection_result must pass or have a valid product-image minor-difference review")
 
     if site_has_product_visuals:
         if thumbnail.get("classification") != "product-present":

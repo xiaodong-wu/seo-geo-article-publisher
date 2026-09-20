@@ -12,7 +12,7 @@ from PIL import Image
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "validate_article.py"
-SPEC = importlib.util.spec_from_file_location("validate_article_thumbnail", SCRIPT_PATH)
+SPEC = importlib.util.spec_from_file_location("validate_article_product_images", SCRIPT_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"Unable to load {SCRIPT_PATH}")
 validator = importlib.util.module_from_spec(SPEC)
@@ -20,7 +20,7 @@ SPEC.loader.exec_module(validator)
 MINOR = "pass-with-minor-differences"
 
 
-class ThumbnailToleranceTests(unittest.TestCase):
+class ProductImageToleranceTests(unittest.TestCase):
     def setUp(self) -> None:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -99,7 +99,15 @@ class ThumbnailToleranceTests(unittest.TestCase):
             "acceptance_reason": "Brand, labels and all functional parts remain accurate.",
             "disclosure": "缩略图把手反光略亮，产品身份和功能结构未改变。",
         }
+        if any(record is body_record for body_record in self.value["body"]):
+            record["minor_difference_review"].update({
+                "section_context": "The cabinet illustrates system selection, not finish inspection or measured dimensions.",
+                "section_claims_preserved": True,
+            })
         return record
+
+    def records(self) -> list[tuple[str, dict]]:
+        return [("thumbnail", self.value["thumbnail"]), ("body[0]", self.value["body"][0])]
 
     def errors(self) -> list[str]:
         path = self.root / "image-references.json"
@@ -111,12 +119,13 @@ class ThumbnailToleranceTests(unittest.TestCase):
     def test_exact_preservation_remains_accepted(self) -> None:
         self.assertEqual(self.errors(), [])
 
-    def test_documented_minor_thumbnail_differences_are_accepted(self) -> None:
-        record = self.add_minor_review()
-        for aspect in validator.THUMBNAIL_MINOR_DIFFERENCE_ASPECTS:
-            with self.subTest(aspect=aspect):
-                record["minor_difference_review"]["differences"][0]["aspect"] = aspect
-                self.assertEqual(self.errors(), [])
+    def test_documented_minor_differences_are_accepted_in_both_slot_types(self) -> None:
+        for slot, record in self.records():
+            self.add_minor_review(record)
+            for aspect in validator.PRODUCT_MINOR_DIFFERENCE_ASPECTS:
+                with self.subTest(slot=slot, aspect=aspect):
+                    record["minor_difference_review"]["differences"][0]["aspect"] = aspect
+                    self.assertEqual(self.errors(), [])
 
     def test_review_requires_concrete_changes_reason_and_disclosure(self) -> None:
         record = self.add_minor_review()
@@ -142,39 +151,77 @@ class ThumbnailToleranceTests(unittest.TestCase):
         record["inspection_result"] = "pass"
         self.assertTrue(any("inspection_result" in error for error in self.errors()))
 
-    def test_body_images_keep_strict_preservation(self) -> None:
-        self.add_minor_review(self.value["body"][0])
-        self.assertTrue(any("only for a product-present thumbnail" in error for error in self.errors()))
+    def test_body_tolerance_requires_section_context_and_preserved_claims(self) -> None:
+        record = self.add_minor_review(self.value["body"][0])
+        review = record["minor_difference_review"]
+        for field, invalid_values in (
+            ("section_context", (None, "", "   ", False)),
+            ("section_claims_preserved", (None, False, "true", 1)),
+        ):
+            original = review.pop(field)
+            self.assertTrue(any(field in error for error in self.errors()))
+            for value in invalid_values:
+                with self.subTest(field=field, value=value):
+                    review[field] = value
+                    self.assertTrue(any(field in error for error in self.errors()))
+            review[field] = original
+        self.assertEqual(self.errors(), [])
 
-    def test_non_product_thumbnail_cannot_use_product_exception(self) -> None:
-        self.add_minor_review()["classification"] = "non-product"
-        self.assertTrue(any("only for a product-present thumbnail" in error for error in self.errors()))
+    def test_body_tolerance_requires_its_own_review(self) -> None:
+        self.add_minor_review()
+        body = self.add_minor_review(self.value["body"][0])
+        body.pop("minor_difference_review")
+        self.assertTrue(any("body[0] minor_difference_review" in error for error in self.errors()))
+
+    def test_body_review_cannot_accept_changed_identity_or_specifications(self) -> None:
+        body = self.add_minor_review(self.value["body"][0])
+        review = body["minor_difference_review"]
+        review["critical_identity_preserved"] = False
+        self.assertTrue(any("body[0] minor_difference_review.critical_identity_preserved" in error for error in self.errors()))
+        review["critical_identity_preserved"] = True
+        review["differences"] = [{"aspect": "model-number", "description": "The model rating changed."}]
+        self.assertTrue(any("body[0] minor_difference_review.differences[0].aspect" in error for error in self.errors()))
+
+    def test_non_product_images_cannot_use_product_exception(self) -> None:
+        for slot, record in self.records():
+            with self.subTest(slot=slot):
+                self.add_minor_review(record)["classification"] = "non-product"
+                self.assertTrue(any("only for a product-present thumbnail or body image" in error for error in self.errors()))
+                record["classification"] = "product-present"
 
     def test_brand_and_label_changes_cannot_use_exception(self) -> None:
-        record = self.add_minor_review()
-        for field in ("brand_text", "label_text"):
-            for result in ("fail", MINOR):
-                with self.subTest(field=field, result=result):
-                    record["identity_checks"][field] = result
-                    self.assertTrue(any(f"identity_checks.{field}" in error for error in self.errors()))
-                    record["identity_checks"][field] = "pass"
+        for slot, record in self.records():
+            self.add_minor_review(record)
+            for field in ("brand_text", "label_text"):
+                for result in ("fail", MINOR):
+                    with self.subTest(slot=slot, field=field, result=result):
+                        record["identity_checks"][field] = result
+                        self.assertTrue(any(f"{slot} identity_checks.{field}" in error for error in self.errors()))
+                        record["identity_checks"][field] = "pass"
 
     def test_failed_visual_checks_cannot_be_overridden_by_review(self) -> None:
-        record = self.add_minor_review()
-        for section, field in (("identity_checks", "product_geometry"), ("identity_checks", "packaging"), ("visual_inspection", "source_vs_final_webp"), ("visual_inspection", "locked_product_vs_generated")):
-            with self.subTest(section=section, field=field):
-                record[section][field] = "fail"
-                self.assertTrue(any(f"{section}.{field}" in error for error in self.errors()))
-                record[section][field] = MINOR
+        for slot, record in self.records():
+            self.add_minor_review(record)
+            for section, field in (("identity_checks", "product_geometry"), ("identity_checks", "packaging"), ("visual_inspection", "source_vs_final_webp"), ("visual_inspection", "locked_product_vs_generated")):
+                with self.subTest(slot=slot, section=section, field=field):
+                    record[section][field] = "fail"
+                    self.assertTrue(any(f"{slot} {section}.{field}" in error for error in self.errors()))
+                    record[section][field] = MINOR
 
     def test_source_extraction_stays_strict(self) -> None:
-        record = self.add_minor_review()
-        record["visual_inspection"]["source_vs_locked_product"] = MINOR
-        self.assertTrue(any("source_vs_locked_product" in error for error in self.errors()))
+        for slot, record in self.records():
+            with self.subTest(slot=slot):
+                self.add_minor_review(record)
+                record["visual_inspection"]["source_vs_locked_product"] = MINOR
+                self.assertTrue(any(f"{slot} visual_inspection.source_vs_locked_product" in error for error in self.errors()))
+                record["visual_inspection"]["source_vs_locked_product"] = "pass"
 
     def test_minor_review_does_not_bypass_generation_evidence(self) -> None:
-        self.add_minor_review()["adaptation"]["deterministic_composite_used"] = True
-        self.assertTrue(any("deterministic_composite_used" in error for error in self.errors()))
+        for slot, record in self.records():
+            with self.subTest(slot=slot):
+                self.add_minor_review(record)["adaptation"]["deterministic_composite_used"] = True
+                self.assertTrue(any(f"{slot} adaptation.deterministic_composite_used" in error for error in self.errors()))
+                record["adaptation"]["deterministic_composite_used"] = False
 
 
 if __name__ == "__main__":

@@ -23,9 +23,10 @@ It combines keyword-led search-intent research, title and outline diversity, sit
   including synonyms and related product families, and records catalogue coverage.
 - Builds and deduplicates a same-site image candidate pool before assigning image slots.
 - Requires different source images and article roles unless only one valid product source exists.
-- Preserves original product identity during whole-image regeneration; thumbnails may have
-  documented minor cosmetic differences while branding, labels, specifications, and critical
-  structure remain accurate. Body images retain strict preservation.
+- Preserves original product identity during whole-image regeneration; thumbnails and body images
+  may have documented minor cosmetic differences while branding, labels, specifications, and
+  critical structure remain accurate. Body-image reviews also verify that the differences do not
+  change the section's explanation or claims.
 - Validates content structure, length, FAQ count, links, theme contrast, image diversity, and product-identity evidence.
 - Publishes through a multipart WUZHICMS endpoint, checks body images on the article detail page,
   and verifies the thumbnail asset plus its appearance on the article listing page.
