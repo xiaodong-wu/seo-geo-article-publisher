@@ -38,12 +38,16 @@ Fail only when the available evidence still cannot support a truthful article an
 Save `<row-run-dir>/product-discovery.json` and link it from the row manifest. Include:
 
 - `seed_urls` and `search_terms` (keyword, synonyms, family, material, application).
+- `run_id` and `site_host` identifying the current row's run and site.
 - `catalogue_sources`: each root/category/sitemap URL, access result, visited pagination URLs,
   discovered product count, and whether traversal reached its end.
 - `products`: deduplicated discovered detail URLs with titles or other inspected list metadata;
   record which details were opened and which list/sitemap discovered them.
 - `matches`: product URL, verified name, relevance (`exact-product` or `same-product-family`),
-  relevance explanation, usable original image URLs, and any fact or suitability limitations.
+  relevance explanation, and `gallery_image_urls` containing every original gallery image URL
+  observed on that detail page, including slides, alternate views, and full-resolution links.
+  Record usable images and fact/suitability limitations separately; do not reduce the inventory
+  to the chosen product's first picture or copy it from a previous run.
 - `coverage_status`: `complete` for all discovered accessible catalogue paths traversed to their
   end, or `incomplete` with the blocked/unvisited URLs and reasons in `coverage_gaps`.
 - `selected_product_urls`, `selection_reason`, and `no_suitable_product_reason` when applicable.
@@ -54,3 +58,7 @@ route. Sufficient verified matches can still support publication despite a discl
 If no match can be verified because access is incomplete, report an access/coverage limitation;
 do not report that the whole site has no relevant product. Include the coverage summary and chosen
 product links in the run result.
+
+Next follow [image-selection.md](image-selection.md): review and classify the complete galleries
+of all relevant matches before constructing the 3–8 image shortlist. A product shortlist, a renewed
+download of an old image, or an unchanged page count is not evidence of a fresh gallery inspection.

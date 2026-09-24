@@ -119,6 +119,19 @@ class ProductImageToleranceTests(unittest.TestCase):
     def test_exact_preservation_remains_accepted(self) -> None:
         self.assertEqual(self.errors(), [])
 
+    def test_context_thumbnail_does_not_require_an_unrelated_product(self) -> None:
+        self.value["topic_product_visuals"] = False
+        thumbnail = self.value["thumbnail"]
+        thumbnail["classification"] = "non-product"
+        thumbnail.pop("source_identity")
+        self.assertEqual(self.errors(), [])
+        # The comparison product in the body still has all identity checks.
+        self.value["body"][0]["identity_checks"]["brand_text"] = "fail"
+        self.assertTrue(any("brand_text" in error for error in self.errors()))
+        self.value["body"][0]["identity_checks"]["brand_text"] = "pass"
+        self.value["topic_product_visuals"] = True
+        self.assertTrue(any("Thumbnail must be product-present" in error for error in self.errors()))
+
     def test_documented_minor_differences_are_accepted_in_both_slot_types(self) -> None:
         for slot, record in self.records():
             self.add_minor_review(record)

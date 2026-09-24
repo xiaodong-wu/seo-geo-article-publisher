@@ -506,6 +506,9 @@ photograph, or competitor site.
 - Create every final image from visual references taken from the same site and record the exact
   reference page and image URLs in the manifest.
 - Build and deduplicate a global candidate pool before assigning the thumbnail or any body slot.
+  Follow [image-selection.md](image-selection.md) for the required fresh-gallery evidence, recent
+  source history, complete score matrix, and deterministic assignment. This validation contract
+  also applies to retries; an old shortlist is not a fresh discovery result.
   Prefer 3–8 retained candidates for the article: verified exact-product or relevant same-family
   views discovered across the catalogue plus same-site factory, laboratory, application, production,
   packaging, warehouse, or service scenes. Candidate shortage is allowed only with a concrete
@@ -522,15 +525,19 @@ photograph, or competitor site.
 - Plan all slots at once with `weighted-global-assignment-with-duplicate-penalty`; do not select
   images greedily one slot at a time. Score each candidate from 0–100 for the intended slot and
   calculate `weighted_total` as 30% keyword/product relevance, 25% identity clarity, 15% image
-  quality, 15% section fit, and 15% diversity. A high score is not permission to change product
+  quality, 15% section fit, and 15% diversity. The first four scores require inspected evidence;
+  `image_selection.py` computes diversity from source-image and product reuse in recent articles.
+  Filenames and previous selections are not scoring evidence. A high score is not permission to change product
   identity or use an unrelated image.
 - Give every slot a distinct article role. Use `product-hero` for the thumbnail when a valid
-  product source exists; body roles may be `product-detail`, `inspection-comparison`,
+  primary-topic product source exists; a comparison-only product cannot be the thumbnail.
+  Body roles may be `product-detail`, `inspection-comparison`,
   `factory-production`, `laboratory-quality`, `application-use`, `packaging-logistics`, or
   `warehouse-supply`, selected only when they fit the surrounding section. The image placement and
   alt text must express that role.
 - Use a retained source candidate no more than once per article. The only exception is when the
-  deduplicated pool contains exactly one eligible product candidate: it may be used in at most two
+  complete gallery audit contains exactly one eligible primary-topic product source, including
+  sources left out of the shortlist: it may be used in at most two
   slots, `selection_plan.duplicate_exception` must document the affected slots and mitigation, and
   the resulting images must differ in article role, section purpose, composition, scale, and
   regenerated scene. Fill other slots with relevant same-site non-product candidates. Product
@@ -709,7 +716,9 @@ Use the extracted product as a mandatory protected input while regenerating the 
 ask the model to recreate the branded product from text, and do not build the final image by
 separately generating a background and pasting the product onto it. Save the source, mask, extracted
 locked product, prompt, raw whole-image generation, and final WebP for validation.
-- Save those records as `image-references.json` with this shape and pass it to the article validator:
+- Save those records as `image-references.json` and pass it to the article validator. The abbreviated
+  identity example below must be extended with `topic_product_visuals`, `selection_context`, each
+  candidate's source-page/topic fields, and the computed plan from [image-selection.md](image-selection.md).
 
 ```json
 {
@@ -882,11 +891,16 @@ locked product, prompt, raw whole-image generation, and final WebP for validatio
 }
 ```
 
-The `body` array must match placeholder/upload order. When product visuals exist, the thumbnail and
-at least one body image must be `product-present`. Set `site_has_branded_product_visuals` and
-`site_has_legible_product_labels` from the inspected site references. When either is true, both the
-thumbnail and at least one body record must contain the exact corresponding source-identity text and
-a passing brand/label check. The examples show exact preservation; for accepted minor differences
+The `body` array must match placeholder/upload order. When verified primary-topic product visuals
+exist (`topic_product_visuals: true`), the thumbnail and at least one body image must be
+`product-present`. A product shown solely for comparison cannot satisfy that requirement. When no
+primary-topic product visual exists, record `no_topic_product_visual_reason` and choose an accurate
+same-site process, laboratory, factory, or other relevant scene; do not relabel another product.
+Set `site_has_branded_product_visuals` and `site_has_legible_product_labels` from the inspected
+site references. When primary-topic product visuals are available and either flag is true, both
+the thumbnail and at least one body record must contain the exact corresponding source-identity
+text and a passing brand/label check. Comparison-only product images also retain their own full
+identity checks. The examples show exact preservation; for accepted minor differences
 in either slot type, apply the statuses and `minor_difference_review` in **Product-image acceptance**,
 including section-purpose evidence for body images. When a capability is false, give a concrete
 corresponding reason. When no product visual exists, set all three booleans to `false` and give
@@ -895,7 +909,8 @@ corresponding reason. When no product visual exists, set all three booleans to `
 The example abbreviates `selection_plan.slots`; the real file must contain exactly one slot in
 upload order for `thumbnail`, `body-01`, `body-02`, and so on, and each slot must match the
 corresponding record's `candidate_id`, classification, reference URL, and reference file. Article
-roles must be unique. If the only eligible product candidate is intentionally reused, set
+roles must be unique. If the complete gallery audit proves the only eligible primary-topic product
+source is intentionally reused, set
 `duplicate_exception` to an object containing its `candidate_id`, the two `slots`,
 `valid_product_candidates: 1`, a concrete `reason`, and a concrete `mitigation`; otherwise keep it
 `null`.

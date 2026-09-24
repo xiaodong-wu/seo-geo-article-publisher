@@ -89,7 +89,11 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      `external_source_reason`.
    - Use only confirmed site facts and general industry knowledge. Record source URLs for claims,
      internal links, and image references in the manifest.
-   - Build one global same-site candidate pool before selecting any image. Prefer 3–8 distinct
+   - Follow [references/image-selection.md](references/image-selection.md) before choosing images.
+     Build the source inventory from this run's discovered product galleries and supporting pages;
+     never reuse a previous run's candidate list as the discovery result. Inspect every image in
+     every relevant gallery before shortlisting, including alternate views and gallery slides.
+     Build one global same-site candidate pool before selecting any image. Prefer 3–8 distinct
      candidates across the relevant product galleries discovered throughout the site and factory, application,
      laboratory, production, packaging, warehouse, or service pages. Keep the highest-resolution
      product views that make the real product verifiable. Do not add a different SKU, variant, or
@@ -105,6 +109,10 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      "correct" label text.
    - Record whether the site has product visuals, visibly branded product visuals, and legible
      product labels. A generic category illustration does not count as a product reference.
+     Separately record `topic_product_visuals`: a product used only for a comparison cannot
+     represent the primary topic in the thumbnail. For example, plant-protein packaging cannot
+     serve as a whey-product hero. If no primary-topic product is verified, use a truthful relevant
+     same-site process or laboratory scene and explain the limitation.
    - Record the selected primary slug as `search_intent`, the optional subordinate slug as
      `secondary_intent`, and the stage as `buyer_stage`; require all three to match
      `intent-analysis.json`. Stop and mark the row failed if the site lacks enough trustworthy
@@ -190,16 +198,19 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      viewport units, or fluid `clamp()` expressions for text sizing because the host sites define
      root typography differently.
    - Place `[IMAGE_BASE64]` repeatedly at the intended body-image locations.
-   - Plan the thumbnail and all body images together before generating any of them. Use
-     `weighted-global-assignment-with-duplicate-penalty`, score every candidate for the intended
-     slot with 30% keyword/product relevance, 25% identity clarity, 15% image quality, 15% section
-     fit, and 15% diversity, and record the scores plus a specific selection reason.
+   - Plan the thumbnail and all body images together before generating any of them. Build current
+     same-site image history with `scripts/image_selection.py history`, inspect the live archive,
+     and run `scripts/image_selection.py plan` as specified in the image-selection reference.
+     Score every candidate for every slot with inspected evidence. The script calculates diversity
+     from the last 20 locally recorded published/API-success articles and computes the global
+     assignment. Never set a fixed diversity score or prefer a filename such as `product-01.webp`.
    - Assign a distinct article role to every slot. Prefer `product-hero` for the thumbnail, then
      choose section-relevant roles such as `product-detail`, `inspection-comparison`,
      `factory-production`, `laboratory-quality`, `application-use`, `packaging-logistics`, or
      `warehouse-supply`. Do not choose the first or clearest product photo greedily for every slot.
    - Select each retained source candidate at most once per article. The only exception is when
-     exactly one valid product candidate exists: that source may appear in at most two slots, the
+     a complete gallery audit finds exactly one eligible primary-topic product source, including
+     sources left out of the shortlist: that source may appear in at most two slots, the
      exception must be documented, and the two outputs must have different roles, composition,
      scale, section purpose, and regenerated scenes. Fill remaining slots with relevant same-site
      non-product candidates. Product identity accuracy always outranks variety.
@@ -240,8 +251,9 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
    - Target 12,000–13,500 visible characters and require 10,000–15,000. Create one thumbnail plus
      4 body images below 12,500 visible characters or 5 body images from 12,500–15,000. Do not
      invent packaging, certificates, factories, test results, label text, or specifications.
-   - When same-site branded/labelled product visuals exist, require the thumbnail and at least one
-     body image to show the original brand and legible label accurately. Do not satisfy this rule
+   - When verified primary-topic product visuals exist, use a product thumbnail and at least one
+     product body image. When these sources are branded/labelled, require both to show the original
+     brand and legible label accurately. Do not satisfy this rule
      by shrinking, blurring, turning away, or obscuring the package.
    - Load the original reference, extracted locked product, raw whole-image generation, and final
      WebP with `view_image` (or equivalent original-detail visual inspection) and compare them side
@@ -343,6 +355,10 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 ```bash
 python scripts/analyze_image_pool.py --image CANDIDATE_1 --reference-url SAME_SITE_URL_1 \
   [--image CANDIDATE_2 --reference-url SAME_SITE_URL_2 ...] --output IMAGE_POOL_JSON
+python scripts/image_selection.py history --runs-dir ARTICLE_RUNS_DIR \
+  --site-host TAB_HOST --run-id RUN_ID --output ROW_RUN_DIR/image-history.json
+python scripts/image_selection.py plan --site-host TAB_HOST \
+  --image-reference-file ROW_RUN_DIR/image-references.json
 python scripts/prepare_locked_product.py --source SOURCE_PRODUCT \
   --mask INSPECTED_MASK_PNG --output LOCKED_PRODUCT_PNG --report LOCK_REPORT_JSON
 python scripts/select_title_mode.py --seed "RUN_ID|TAB|ROW_NUMBER|CORE_KEYWORD" \

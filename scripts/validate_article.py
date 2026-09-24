@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import colorsys
 import hashlib
+import importlib.util
 import json
 import math
 import re
@@ -1842,6 +1843,16 @@ def validate_image_selection(
     body: list[object],
 ) -> tuple[int, int, int | None, int | None, bool, list[str]]:
     errors: list[str] = []
+    # Load by file path too: this validator is imported directly by audit/test tools.
+    spec = importlib.util.spec_from_file_location(
+        "publisher_image_selection", Path(__file__).with_name("image_selection.py")
+    )
+    if spec is None or spec.loader is None:
+        errors.append("Image selection evidence validator is unavailable")
+    else:
+        selection = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(selection)
+        errors.extend(selection.validate_selection_evidence(value, manifest_path, host))
     bare_host = host[4:] if host.startswith("www.") else host
     allowed_hosts = {bare_host, f"www.{bare_host}"}
     expected_slots = ["thumbnail"] + [
@@ -2166,6 +2177,7 @@ def validate_image_selection(
         for candidate_id, technical in candidate_technical.items()
         if technical["classification"] == "product-present"
         and technical["eligible"] is True
+        and candidates[candidate_id].get("topic_relation") == "primary-topic"
     ]
     duplicate_exception = selection_plan.get("duplicate_exception")
     exception_used = bool(repeated_ids)
@@ -2938,10 +2950,11 @@ def validate_image_references(
         if normalize_space(str(record.get("inspection_result", ""))).lower() not in accepted_visual_results:
             errors.append(f"{label} inspection_result must pass or have a valid product-image minor-difference review")
 
-    if site_has_product_visuals:
+    topic_product_visuals = site_has_product_visuals and value.get("topic_product_visuals", True)
+    if topic_product_visuals:
         if thumbnail.get("classification") != "product-present":
             errors.append(
-                "Thumbnail must be product-present when same-site product visuals exist"
+                "Thumbnail must be product-present when primary-topic product visuals exist"
             )
         if not any(
             isinstance(record, dict)
@@ -2949,10 +2962,10 @@ def validate_image_references(
             for record in body
         ):
             errors.append(
-                "At least one body image must be product-present when product visuals exist"
+                "At least one body image must be product-present when primary-topic product visuals exist"
             )
 
-    if site_has_branded_product_visuals:
+    if site_has_branded_product_visuals and topic_product_visuals:
         thumbnail_brand_text = (
             thumbnail.get("source_identity", {}).get("brand_text", [])
             if isinstance(thumbnail.get("source_identity"), dict)
@@ -2977,7 +2990,7 @@ def validate_image_references(
                 "when branded product visuals exist"
             )
 
-    if site_has_legible_product_labels:
+    if site_has_legible_product_labels and topic_product_visuals:
         thumbnail_label_text = (
             thumbnail.get("source_identity", {}).get("label_text", [])
             if isinstance(thumbnail.get("source_identity"), dict)

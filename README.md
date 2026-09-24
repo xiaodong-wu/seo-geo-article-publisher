@@ -21,8 +21,11 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 - Matches article typography and table colors to each site's observed theme.
 - Searches all same-site product lists, categories, pagination, and sitemaps for relevant products,
   including synonyms and related product families, and records catalogue coverage.
-- Builds and deduplicates a same-site image candidate pool before assigning image slots.
-- Requires different source images and article roles unless only one valid product source exists.
+- Builds a fresh image inventory from every relevant product gallery before shortlisting sources.
+- Calculates image diversity from 20 recent same-site publication records, tracking original URLs,
+  hashes, and product pages, then validates the complete candidate-to-slot assignment.
+- Keeps comparison-only products out of primary-topic thumbnails; requires different sources unless
+  a complete gallery audit proves only one eligible primary-topic product image exists.
 - Preserves original product identity during whole-image regeneration; thumbnails and body images
   may have documented minor cosmetic differences while branding, labels, specifications, and
   critical structure remain accurate. Body-image reviews also verify that the differences do not
@@ -42,10 +45,12 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 ├── references/
 │   ├── api-contract.md
 │   ├── content-spec.md
+│   ├── image-selection.md
 │   ├── product-discovery.md
 │   └── publishing.md
 ├── scripts/
     ├── analyze_image_pool.py
+    ├── image_selection.py
     ├── optimize_image.py
     ├── prepare_locked_product.py
     ├── publish_article.py
