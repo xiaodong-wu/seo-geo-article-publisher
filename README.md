@@ -27,9 +27,10 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 - Keeps comparison-only products out of primary-topic thumbnails; requires different sources unless
   a complete gallery audit proves only one eligible primary-topic product image exists.
 - Preserves original product identity during whole-image regeneration; thumbnails and body images
-  may have documented minor cosmetic differences while branding, labels, specifications, and
-  critical structure remain accurate. Body-image reviews also verify that the differences do not
-  change the section's explanation or claims.
+  may have documented minor cosmetic or incidental-text differences while branding, critical
+  label facts, specifications, and structure remain accurate. Illustrative barcode/receipt or
+  decorative microtext differences may pass when they do not identify the product or support an
+  article claim. Body-image reviews also verify the section's explanation remains accurate.
 - Validates content structure, length, FAQ count, links, theme contrast, image diversity, and product-identity evidence.
 - Publishes through a multipart WUZHICMS endpoint, checks body images on the article detail page,
   and verifies the thumbnail asset plus its appearance on the article listing page.

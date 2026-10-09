@@ -547,9 +547,11 @@ photograph, or competitor site.
   the relevant product/category pages found across the whole site. Prefer the highest-resolution front or three-quarter view
   that makes the actual brand, label, packaging, and product form verifiable.
 - Before generation, transcribe an identity inventory from those references: every visible brand
-  or logo word, the product/variant name and other legible label text, package colors/materials,
-  container geometry, closure, proportions, and visible product form. Copy visible text exactly,
-  including case and spelling. Do not translate, correct, abbreviate, or infer obscured text.
+  or logo word, the product/variant name and critical label facts, package colors/materials,
+  container geometry, closure, proportions, and visible product form. Copy critical text exactly,
+  including case and spelling. Record incidental text by role with readable examples where useful;
+  exhaustive transcription or decoding of illustrative barcodes/QR codes is unnecessary. Do not
+  translate, correct, abbreviate, or infer obscured identity/specification text.
 - Use the original product image as the identity source for whole-image regeneration, not as
   style-only inspiration or a layer for later compositing. Every final `product-present` image must
   be regenerated for the current article placement. The only allowed preservation method is
@@ -575,7 +577,7 @@ photograph, or competitor site.
   form. Whole-object proportional scaling and translation are allowed for composition. Save the
   raw whole-image generation before WebP encoding and judge the actual result, not the prompt.
 - Apply **Product-image acceptance** below to both thumbnails and body images. Reject a substituted
-  or generic product, changed brand/label/model/specifications, invented claims, or missing critical
+  or generic product, changed brand/critical label facts/model/specifications, invented claims, or missing critical
   components. A minor-difference disclosure cannot make a materially different product acceptable.
 - Make at most one corrective retry per rejected image slot with the extracted product and
   inspected mask. If the second result still fails the applicable criteria, fail the image and row.
@@ -591,7 +593,7 @@ photograph, or competitor site.
 - Provide a distinct, accurate English alt text for each body image. Describe visible content and
   purpose; use the core or related keyword only when natural.
 - Inspect every generated image at full size using the slot-specific criteria. Reject changed
-  brand/label text or generic replacement packaging. Reject invented certifications, performance claims, contact
+  brand/critical label text or generic replacement packaging. Reject invented certifications, performance claims, contact
   details, third-party branding, or a misleading factory/product context.
 - Load the source reference, extracted locked product, raw whole-image generation, and final WebP
   with `view_image` (or an equivalent original-detail viewer), and compare all four side by side at
@@ -635,6 +637,11 @@ regenerate a usable image solely for these minor differences:
   while the material, color, apparent particle size, and powder form remain accurate. Changing
   powder into granules, capsules, a different ingredient, or an apparently different quality is
   not acceptable.
+- `incidental-text`: small differences in illustrative barcode/QR patterns or digits, sample
+  receipt dates/items/amounts, or decorative small print that do not identify the product, change
+  a product fact, or substantiate an article claim. Judge the text's role before treating each
+  character as a pass/fail condition. Do not retry solely to recover an irrelevant barcode digit.
+  This applies equally to the thumbnail and body images.
 
 For body images, assess the difference against the **actual section purpose**. A slightly brighter
 cabinet may illustrate system selection, and a slightly rearranged powder heap may illustrate a
@@ -643,17 +650,24 @@ evidence of dimensions, finish condition, particle size, clumping, defects, or a
 detail. Record the section's purpose and why its explanation remains accurate. Do not change
 accurate article claims or hide identifying details merely to pass an image.
 
-Reject changed logo/brand letters, label words or numbers, model, ingredient, specification,
+Reject changed logo/brand letters, product/variant names, model, ingredient, specification,
 certification or performance claims, a different product/variant, missing or added functional
 components, substantially different shape/colors, and obscured identifying text. Judge significance
 against the inspected source and product facts; do not invent a numeric similarity threshold or
 claim unseen details match. If unsure whether a change affects function or identity, retry or fail.
+Capacity, net weight, pack quantity, dimensions, material/ingredient names, ratings and warnings
+remain critical even when printed very small. A barcode is critical when used as a SKU, batch,
+traceability, authentication or scan-performance example. Receipt text is critical when the article
+uses its exact value or print quality as evidence. Incidental text must not introduce a new brand,
+contact detail, certification or product claim. Prefer a plainly illustrative caption where needed;
+do not remove legitimate article claims or hide labels merely to pass an image.
 
 For an accepted product image with differences, use `pass-with-minor-differences` for
 `inspection_result`, each affected `identity_checks.packaging`/`product_geometry` check, and each
 affected `visual_inspection.locked_product_vs_generated`/`source_vs_final_webp` comparison. Other
 checks remain `pass` (or the existing `not-visible-in-reference` for absent source text).
-Brand/label checks and `source_vs_locked_product` never use the relaxed status. Add:
+Brand checks and `source_vs_locked_product` never use the relaxed status. `label_text` may use it
+only for the incidental-text case documented below; critical label text must still pass. Add:
 
 ```json
 {
@@ -678,6 +692,53 @@ Brand/label checks and `source_vs_locked_product` never use the relaxed status. 
 for each body image using this tolerance; thumbnails may omit these two fields. A false or unknown
 assessment cannot pass. Exact-match records continue to use `pass` without a review object.
 
+When a label difference is incidental, add `critical_label_text` to `source_identity` as the exact
+critical strings already inventoried in `label_text`. Include all identifying/specification facts,
+not just the ones that survived generation. If there genuinely are no critical label facts, use
+an empty array plus `no_critical_label_text_reason`. Keep the source inventory truthful. Use this
+additional evidence together with the normal minor review (including section context for bodies):
+
+```json
+{
+  "source_identity": {
+    "brand_text": [],
+    "label_text": ["THERMAL RECEIPT PAPER", "57mm x 40mm x 12mm", "10 ROLLS/PACK"],
+    "critical_label_text": ["THERMAL RECEIPT PAPER", "57mm x 40mm x 12mm", "10 ROLLS/PACK"],
+    "packaging_details": ["White receipt roll with brown core and printed sample"]
+  },
+  "identity_checks": {
+    "brand_text": "not-visible-in-reference",
+    "critical_label_text": "pass",
+    "label_text": "pass-with-minor-differences",
+    "packaging": "pass",
+    "product_geometry": "pass"
+  },
+  "inspection_result": "pass-with-minor-differences",
+  "minor_difference_review": {
+    "severity": "minor",
+    "critical_identity_preserved": true,
+    "critical_label_text_preserved": true,
+    "differences": [{
+      "aspect": "incidental-text",
+      "text_role": "barcode",
+      "description": "Several digits below the illustrative barcode differ from the source.",
+      "used_as_article_evidence": false,
+      "noncritical_reason": "This article illustrates the receipt roll format, not barcode contents, product identification or scan accuracy."
+    }],
+    "acceptance_reason": "The product name, dimensions, pack quantity and roll/core structure remain accurate.",
+    "disclosure": "正文示意条码的部分数字有变化；产品名称、规格、包装数量及纸卷结构保留，不用该条码证明商品身份或扫描性能。",
+    "section_context": "The receipt roll illustrates the product format; qualification relies on actual sample testing.",
+    "section_claims_preserved": true
+  }
+}
+```
+
+`text_role` is one of `barcode`, `qr-code`, `illustrative-receipt`, or
+`decorative-small-print`. Each such difference needs a concrete description,
+`used_as_article_evidence: false`, and a non-empty `noncritical_reason`. A changed brand or a
+failed critical-text check cannot be overridden by this review. A label recorded as `fail` remains
+rejected; accepting it requires an actual visual reassessment and honest updated evidence.
+
 Record every observed difference specifically; do not write only “close enough.” Recheck the final
 WebP and update the review if encoding changes the assessment. Copy the disclosure and acceptance
 reason into the per-site run manifest and the user-facing run result, identifying the thumbnail or
@@ -697,8 +758,10 @@ Asset type: B2B article thumbnail or body image
 Input image 1: extracted and locked original site product; mandatory identity object
 Input image 2: inspected product lock mask
 Primary request: regenerate the complete final image in one cohesive pass around the locked product
-Text (verbatim): "<exact brand and label text from the identity inventory>"
-Product invariants: preserve the actual brand/logo, every legible letter and number, model,
+Critical text (verbatim): "<exact brand, product name and critical label facts from the inventory>"
+Incidental text: <identified barcode/QR/sample receipt/decorative text; aim to retain, but do not
+reconstruct unclear characters or let unimportant microtext dominate the generation prompt>
+Product invariants: preserve the actual brand/logo, product name, model,
 specifications, ingredient identity, package color/material, closures and functional components
 Fidelity target: retain source geometry, proportions, reflections, texture and visible material
 arrangement as closely as possible; never replace the product with a similar or generic one
@@ -899,7 +962,8 @@ same-site process, laboratory, factory, or other relevant scene; do not relabel 
 Set `site_has_branded_product_visuals` and `site_has_legible_product_labels` from the inspected
 site references. When primary-topic product visuals are available and either flag is true, both
 the thumbnail and at least one body record must contain the exact corresponding source-identity
-text and a passing brand/label check. Comparison-only product images also retain their own full
+text and a passing brand/critical-label check; incidental label differences need the documented
+review above. Comparison-only product images also retain their own full
 identity checks. The examples show exact preservation; for accepted minor differences
 in either slot type, apply the statuses and `minor_difference_review` in **Product-image acceptance**,
 including section-purpose evidence for body images. When a capability is false, give a concrete

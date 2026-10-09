@@ -2297,6 +2297,13 @@ PRODUCT_MINOR_DIFFERENCE_ASPECTS = {
     "non-functional-detail",
     "slight-proportion",
     "loose-material-arrangement",
+    "incidental-text",
+}
+INCIDENTAL_TEXT_ROLES = {
+    "barcode",
+    "qr-code",
+    "illustrative-receipt",
+    "decorative-small-print",
 }
 
 
@@ -2352,6 +2359,36 @@ def validate_product_minor_differences(
             description = difference.get("description")
             if not isinstance(description, str) or not normalize_space(description):
                 errors.append(f"{prefix}.description must explain the observed difference")
+            if aspect == "incidental-text":
+                text_role = difference.get("text_role")
+                if not isinstance(text_role, str) or text_role not in INCIDENTAL_TEXT_ROLES:
+                    errors.append(f"{prefix}.text_role must identify permitted incidental text")
+                if difference.get("used_as_article_evidence") is not False:
+                    errors.append(f"{prefix}.used_as_article_evidence must be false")
+                reason = difference.get("noncritical_reason")
+                if not isinstance(reason, str) or not normalize_space(reason):
+                    errors.append(f"{prefix}.noncritical_reason must explain why the text is incidental")
+        if any(isinstance(item, dict) and item.get("aspect") == "incidental-text" for item in differences):
+            if review.get("critical_label_text_preserved") is not True:
+                errors.append(f"{label} minor_difference_review.critical_label_text_preserved must be true")
+            identity = record.get("source_identity")
+            identity = identity if isinstance(identity, dict) else {}
+            critical_text = nonempty_string_list(identity.get("critical_label_text"))
+            source_text = nonempty_string_list(identity.get("label_text")) or []
+            if critical_text is None:
+                errors.append(f"{label} source_identity.critical_label_text must be an array of exact source strings")
+            elif any(item not in source_text for item in critical_text):
+                errors.append(f"{label} source_identity.critical_label_text must be drawn from label_text")
+            elif not critical_text:
+                reason = identity.get("no_critical_label_text_reason")
+                if not isinstance(reason, str) or not normalize_space(reason):
+                    errors.append(f"{label} source_identity.no_critical_label_text_reason is required when critical text is absent")
+            checks = record.get("identity_checks")
+            checks = checks if isinstance(checks, dict) else {}
+            if checks.get("critical_label_text") != "pass":
+                errors.append(f"{label} identity_checks.critical_label_text must be pass")
+            if checks.get("label_text") != MINOR_DIFFERENCE_PASS:
+                errors.append(f"{label} incidental text differences require identity_checks.label_text {MINOR_DIFFERENCE_PASS}")
     return not errors, errors
 
 
@@ -2870,6 +2907,12 @@ def validate_image_references(
 
             expected_brand_check = "pass" if brand_text else NOT_VISIBLE
             expected_label_check = "pass" if label_text else NOT_VISIBLE
+            accepted_label_results = {expected_label_check}
+            if minor_differences_allowed and label_text and any(
+                item.get("aspect") == "incidental-text"
+                for item in record["minor_difference_review"]["differences"]
+            ):
+                accepted_label_results.add(MINOR_DIFFERENCE_PASS)
             if brand_check != expected_brand_check:
                 errors.append(
                     f"{label} identity_checks.brand_text must be "
@@ -2877,10 +2920,10 @@ def validate_image_references(
                 )
             elif brand_check == "pass":
                 brand_preserved_count += 1
-            if label_check != expected_label_check:
+            if label_check not in accepted_label_results:
                 errors.append(
                     f"{label} identity_checks.label_text must be "
-                    f"{expected_label_check}"
+                    f"{expected_label_check} or have a valid incidental-text review"
                 )
             elif label_check == "pass":
                 label_preserved_count += 1
@@ -2998,7 +3041,7 @@ def validate_image_references(
         )
         if not nonempty_string_list(thumbnail_label_text):
             errors.append(
-                "Thumbnail must preserve exact source label text when legible "
+                "Thumbnail must inventory source label text when legible "
                 "product labels exist"
             )
         if not any(
@@ -3011,7 +3054,7 @@ def validate_image_references(
             for record in body
         ):
             errors.append(
-                "At least one body image must preserve exact source label text "
+                "At least one body image must inventory source label text "
                 "when legible product labels exist"
             )
 

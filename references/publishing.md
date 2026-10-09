@@ -118,7 +118,9 @@ metrics, API status, returned article ID/URL, image paths, verification attempts
 state in `manifest.json`. Redact authorization headers and publishing keys.
 
 Include the `product-discovery.json` path, catalogue coverage and any access gaps, and selected
-product URLs. When a thumbnail is accepted with minor differences, copy its
+product URLs. When a thumbnail or body image is accepted with minor differences, copy its
 `minor_difference_review.disclosure` and `acceptance_reason` into the per-site manifest and user
 result, and link the source and final image evidence. Say which details differ; do not describe
-this outcome as exact preservation. The normal publication/verification status still applies.
+this outcome as exact preservation. Identify any incidental text changes and why the text is not
+product-identifying or evidence for an article claim. The normal publication/verification status
+still applies.

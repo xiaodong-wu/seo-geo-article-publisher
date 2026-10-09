@@ -104,9 +104,9 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      relevance, product-lock eligibility, and an exact identity summary. If fewer than the
      preferred candidates remain, record a concrete `candidate_pool_limit_reason`.
    - For every product candidate, inventory the exact visible brand/logo text, product or variant
-     name, other legible label text, package colors/materials, container shape, closures,
-     proportions, and product form. Preserve capitalization and spelling; never translate or
-     "correct" label text.
+     name, key specification/quantity text, package colors/materials, container shape, closures,
+     proportions, and product form. Inventory critical text exactly. Identify incidental barcodes,
+     example receipt text and decorative microtext by role; do not infer obscured characters.
    - Record whether the site has product visuals, visibly branded product visuals, and legible
      product labels. A generic category illustration does not count as a product reference.
      Separately record `topic_product_visuals`: a product used only for a comparison cannot
@@ -236,14 +236,19 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      closure, proportions, reflections, accessories, or visible product form.
    - Apply the product-image acceptance rules in `references/content-spec.md` to thumbnails and
      body images: minor lighting, surface, non-functional detail, slight proportion, or loose-material
-     arrangement differences may pass when product identity, brand/label text, model/specifications,
-     and critical structure remain accurate. Record
+     arrangement differences may pass when product identity, brand, critical label text,
+     model/specifications, and critical structure remain accurate. Incidental text differences
+     (barcode digits/patterns, sample receipt amounts/dates, decorative small print) may also pass
+     when they do not identify the product or support an article claim; apply the `incidental-text`
+     review in **Product-image acceptance** in `references/content-spec.md`. Small print is not
+     automatically incidental: model, quantity, ingredients, ratings and certification text stay
+     critical regardless of size. Record
      `pass-with-minor-differences` and a complete `minor_difference_review`; explain the concrete
      differences and why they are acceptable in the run result. For a body image, also record its
      `section_context` and confirm `section_claims_preserved`: the difference must not alter what
      the surrounding text uses the image to explain. Do not retry an acceptable image solely to
      eliminate minor differences; a generative edit need not be pixel-identical to its source.
-   - Reject substantive product changes, changed brand/label text, or misleading specifications.
+   - Reject substantive product changes, changed brand or critical label text, or misleading specifications.
      Make at most one corrective retry for the image slot with the source and mask; if the
      applicable image checks still fail, fail the image and row. Do not fall back to deterministic
      compositing, the unchanged source, or a `contain`-only output. Use same-site factory, application,
@@ -253,7 +258,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      invent packaging, certificates, factories, test results, label text, or specifications.
    - When verified primary-topic product visuals exist, use a product thumbnail and at least one
      product body image. When these sources are branded/labelled, require both to show the original
-     brand and legible label accurately. Do not satisfy this rule
+     brand and critical label text accurately, with any accepted incidental-text differences
+     disclosed in the run result. Do not satisfy this rule
      by shrinking, blurring, turning away, or obscuring the package.
    - Load the original reference, extracted locked product, raw whole-image generation, and final
      WebP with `view_image` (or equivalent original-detail visual inspection) and compare them side
@@ -284,7 +290,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      same-site product-identity evidence, an extracted locked product and mask, auditable raw
      whole-image regeneration, and passing brand, label, packaging, geometry, and side-by-side
      visual checks for every `product-present` image, including the documented
-     minor-difference outcome. Brand/label and source-extraction checks remain strict. Reject deterministic composites,
+     minor-difference outcome. Brand, critical label facts and source extraction remain strict;
+     `label_text` may use the relaxed status only with a valid incidental-text review. Reject deterministic composites,
      background-only edits, unchanged-source, and contain-only product outputs.
    - Require a 3–8-candidate global image plan unless a concrete shortage is documented. Require
      recorded source hashes, consolidation of exact/near duplicates, weighted whole-article slot

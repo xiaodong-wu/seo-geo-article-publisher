@@ -109,6 +109,24 @@ class ProductImageToleranceTests(unittest.TestCase):
     def records(self) -> list[tuple[str, dict]]:
         return [("thumbnail", self.value["thumbnail"]), ("body[0]", self.value["body"][0])]
 
+    def add_incidental_review(self, record: dict) -> dict:
+        self.add_minor_review(record)
+        record["source_identity"]["critical_label_text"] = ["Model A"]
+        record["identity_checks"].update(label_text=MINOR, critical_label_text="pass")
+        record["minor_difference_review"].update({
+            "critical_label_text_preserved": True,
+            "differences": [{
+                "aspect": "incidental-text",
+                "text_role": "barcode",
+                "description": "Two digits below the sample barcode differ from the original.",
+                "used_as_article_evidence": False,
+                "noncritical_reason": "The barcode is illustrative; it is not a SKU, pack quantity or identification evidence in this article.",
+            }],
+            "acceptance_reason": "The brand, model and functional parts remain accurate; barcode data is incidental here.",
+            "disclosure": "示意条码下方两个数字略有变化，品牌、型号与关键结构保留。",
+        })
+        return record
+
     def errors(self) -> list[str]:
         path = self.root / "image-references.json"
         path.write_text(json.dumps(self.value))
@@ -135,7 +153,7 @@ class ProductImageToleranceTests(unittest.TestCase):
     def test_documented_minor_differences_are_accepted_in_both_slot_types(self) -> None:
         for slot, record in self.records():
             self.add_minor_review(record)
-            for aspect in validator.PRODUCT_MINOR_DIFFERENCE_ASPECTS:
+            for aspect in validator.PRODUCT_MINOR_DIFFERENCE_ASPECTS - {"incidental-text"}:
                 with self.subTest(slot=slot, aspect=aspect):
                     record["minor_difference_review"]["differences"][0]["aspect"] = aspect
                     self.assertEqual(self.errors(), [])
@@ -202,7 +220,7 @@ class ProductImageToleranceTests(unittest.TestCase):
                 self.assertTrue(any("only for a product-present thumbnail or body image" in error for error in self.errors()))
                 record["classification"] = "product-present"
 
-    def test_brand_and_label_changes_cannot_use_exception(self) -> None:
+    def test_brand_and_unreviewed_label_changes_cannot_use_exception(self) -> None:
         for slot, record in self.records():
             self.add_minor_review(record)
             for field in ("brand_text", "label_text"):
@@ -211,6 +229,67 @@ class ProductImageToleranceTests(unittest.TestCase):
                         record["identity_checks"][field] = result
                         self.assertTrue(any(f"{slot} identity_checks.{field}" in error for error in self.errors()))
                         record["identity_checks"][field] = "pass"
+
+    def test_incidental_text_changes_are_accepted_in_both_slot_types(self) -> None:
+        for slot, record in self.records():
+            self.add_incidental_review(record)
+            for role in validator.INCIDENTAL_TEXT_ROLES:
+                with self.subTest(slot=slot, role=role):
+                    record["minor_difference_review"]["differences"][0]["text_role"] = role
+                    self.assertEqual(self.errors(), [])
+
+    def test_incidental_text_requires_a_noncritical_explanation_and_unused_evidence(self) -> None:
+        for slot, record in self.records():
+            self.add_incidental_review(record)
+            difference = record["minor_difference_review"]["differences"][0]
+            for field, bad_values in {
+                "text_role": (None, [], "model-number", "pack-quantity"),
+                "used_as_article_evidence": (None, True, 0, "false"),
+                "noncritical_reason": (None, " ", False),
+            }.items():
+                good = difference[field]
+                for bad in bad_values:
+                    with self.subTest(slot=slot, field=field, bad=bad):
+                        difference[field] = bad
+                        self.assertTrue(any(field in error for error in self.errors()))
+                difference[field] = good
+            self.assertEqual(self.errors(), [])
+
+    def test_critical_text_inventory_and_pass_are_required(self) -> None:
+        for slot, record in self.records():
+            self.add_incidental_review(record)
+            source = record["source_identity"]
+            for bad in (None, "Model A", ["Invented model"], []):
+                with self.subTest(slot=slot, bad=bad):
+                    source["critical_label_text"] = bad
+                    self.assertTrue(any("critical_label_text" in error for error in self.errors()))
+            source["critical_label_text"] = ["Model A"]
+            record["identity_checks"]["critical_label_text"] = "fail"
+            self.assertTrue(any("identity_checks.critical_label_text" in error for error in self.errors()))
+            record["identity_checks"]["critical_label_text"] = "pass"
+            for bad in (None, False, "true", 1):
+                record["minor_difference_review"]["critical_label_text_preserved"] = bad
+                self.assertTrue(any("critical_label_text_preserved" in error for error in self.errors()))
+            record["minor_difference_review"]["critical_label_text_preserved"] = True
+            self.assertEqual(self.errors(), [])
+
+    def test_purely_incidental_label_needs_reason_for_no_critical_text(self) -> None:
+        record = self.add_incidental_review(self.value["body"][0])
+        record["source_identity"]["label_text"] = ["Sample receipt"]
+        record["source_identity"]["critical_label_text"] = []
+        self.assertTrue(any("no_critical_label_text_reason" in error for error in self.errors()))
+        record["source_identity"]["no_critical_label_text_reason"] = "The selected unbranded roll has only an illustrative receipt and no model or specification text."
+        self.assertEqual(self.errors(), [])
+
+    def test_incidental_text_review_cannot_hide_brand_changes_or_a_failed_label(self) -> None:
+        for slot, record in self.records():
+            self.add_incidental_review(record)
+            for field, bad in (("brand_text", "fail"), ("brand_text", MINOR), ("label_text", "fail"), ("label_text", "pass")):
+                with self.subTest(slot=slot, field=field, bad=bad):
+                    good = record["identity_checks"][field]
+                    record["identity_checks"][field] = bad
+                    self.assertTrue(any(f"identity_checks.{field}" in error for error in self.errors()))
+                    record["identity_checks"][field] = good
 
     def test_failed_visual_checks_cannot_be_overridden_by_review(self) -> None:
         for slot, record in self.records():
