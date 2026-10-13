@@ -117,6 +117,7 @@ IMAGE_ARTICLE_ROLES = {
     "application-use",
     "packaging-logistics",
     "warehouse-supply",
+    "service-process",
 }
 IMAGE_LABEL_LEGIBILITY = {
     "clear",
