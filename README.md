@@ -18,7 +18,7 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 - Requires a 1.00%–3.00% combined exact core-and-related-keyword density, calculated from weighted
   phrase words and distributed naturally across the visible article content.
 - Prevents target-country and target-customer fields from becoming repetitive title templates.
-- Matches article typography and table colors to each site's observed theme.
+- Matches brand accents, headings, body text and links by their observed site roles. Preserves exact brand fills, uses readable text on those fills, and verifies desktop/mobile computed colors before and after publication.
 - Searches all same-site product lists, categories, pagination, and sitemaps for relevant products,
   including synonyms and related product families, and records catalogue coverage.
 - Builds a fresh image inventory from every relevant product gallery before shortlisting sources.

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import colorsys
 import hashlib
 import importlib.util
 import json
@@ -53,7 +52,8 @@ ARTICLE_KEYWORD_BLOCK_TAGS = {
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 THEME_COLOR_VARIABLES = (
     "--article-accent",
-    "--article-accent-dark",
+    "--article-heading",
+    "--article-link",
     "--article-text",
     "--article-muted",
     "--article-border",
@@ -73,6 +73,8 @@ THEME_EVIDENCE_ROLES = {
     "primary-accent",
     "secondary-accent",
     "body-text",
+    "heading-text",
+    "link-text",
     "muted-text",
     "border",
     "surface",
@@ -1208,25 +1210,6 @@ def contrast_ratio(first: str, second: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def preserves_theme_hue(candidate: str, observed: str) -> bool:
-    def hls(color: str) -> tuple[float, float, float]:
-        channels = [
-            int(color[index : index + 2], 16) / 255
-            for index in (1, 3, 5)
-        ]
-        return colorsys.rgb_to_hls(*channels)
-
-    candidate_hue, _, candidate_saturation = hls(candidate)
-    observed_hue, _, observed_saturation = hls(observed)
-    if observed_saturation < 0.12:
-        return candidate_saturation < 0.12
-    if candidate_saturation < 0.12:
-        return False
-    hue_distance = abs(candidate_hue - observed_hue)
-    hue_distance = min(hue_distance, 1 - hue_distance)
-    return hue_distance <= 20 / 360
-
-
 def validate_site_theme(
     path: Path,
     host: str,
@@ -1362,30 +1345,22 @@ def validate_site_theme(
             )
         applied_colors[variable] = color
 
-    observed_accents = observed_by_role["primary-accent"]
-    for variable in (
-        "--article-accent",
-        "--article-accent-dark",
-        "--article-table-header",
-    ):
-        color = applied_colors.get(variable)
-        if color and observed_accents and not any(
-            color == observed or preserves_theme_hue(color, observed)
-            for observed in observed_accents
-        ):
-            errors.append(
-                f"{variable} must equal or preserve the hue of an observed "
-                "primary-accent color"
-            )
-    text_color = applied_colors.get("--article-text")
-    if text_color and text_color not in observed_by_role["body-text"]:
-        errors.append("--article-text must equal an observed body-text color")
-
-    derivation_notes = normalize_space(str(value.get("derivation_notes", "")))
-    if len(derivation_notes) < 20:
-        errors.append(
-            "theme-colors derivation_notes must explain derived shades and tints"
-        )
+    # Reconstruct every token from its selected role evidence; hue alone cannot
+    # distinguish an original orange from an unrelated dark brown shade.
+    spec = importlib.util.spec_from_file_location(
+        "publisher_theme_palette", Path(__file__).with_name("build_theme_palette.py")
+    )
+    palette_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(palette_module)
+    try:
+        expected_palette = palette_module.build_palette(value)
+        for variable, expected in expected_palette["colors"].items():
+            if applied_colors.get(variable) != expected:
+                errors.append(f"{variable} must equal role-derived color {expected}; arbitrary darkening or cross-site reuse is invalid")
+        if value.get("token_sources") != expected_palette["token_sources"]:
+            errors.append("theme-colors token_sources must match the role-based palette builder")
+    except (ValueError, TypeError, KeyError) as exc:
+        errors.append(f"Site theme evidence: {exc}")
 
     css_declarations: dict[str, list[str]] = {}
     for variable, color in re.findall(
@@ -1418,24 +1393,29 @@ def validate_site_theme(
 
     required_theme_rules = [
         (
+            r"\.article-content\s*\{[^}]*background\s*:\s*"
+            r"var\(\s*--article-surface\s*\)",
+            "Article content background must use --article-surface",
+        ),
+        (
             r"\.article-content\s*\{[^}]*color\s*:\s*"
             r"var\(\s*--article-text\s*\)",
             "Article body text must use --article-text",
         ),
         (
             r"\.article-content\s+h2\s*\{[^}]*color\s*:\s*"
-            r"var\(\s*--article-accent-dark\s*\)",
-            "Article H2 color must use --article-accent-dark",
+            r"var\(\s*--article-heading\s*\)",
+            "Article H2 color must use --article-heading",
         ),
         (
             r"\.article-content\s+h3\s*\{[^}]*color\s*:\s*"
-            r"var\(\s*--article-accent-dark\s*\)",
-            "Article H3 color must use --article-accent-dark",
+            r"var\(\s*--article-heading\s*\)",
+            "Article H3 color must use --article-heading",
         ),
         (
             r"\.article-content\s+a\s*\{[^}]*color\s*:\s*"
-            r"var\(\s*--article-accent\s*\)",
-            "Article links must use --article-accent",
+            r"var\(\s*--article-link\s*\)",
+            "Article links must use --article-link",
         ),
         (
             r"\.article-content\s+figcaption\s*\{[^}]*color\s*:\s*"
@@ -1471,8 +1451,8 @@ def validate_site_theme(
     contrast_pairs = (
         ("body text", "--article-text", "--article-surface"),
         ("muted text", "--article-muted", "--article-surface"),
-        ("links", "--article-accent", "--article-surface"),
-        ("headings", "--article-accent-dark", "--article-surface"),
+        ("links", "--article-link", "--article-surface"),
+        ("headings", "--article-heading", "--article-surface"),
         ("soft callouts", "--article-text", "--article-soft"),
         (
             "table header",
@@ -3289,6 +3269,24 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         css,
     )
     errors.extend(theme_errors)
+    try:
+        rendered = json.loads(read_text(args.rendered_theme_file))
+        if rendered.get("phase") != "prepublish":
+            errors.append("Prepublish browser theme evidence is required")
+        if rendered.get("content_sha256") != hashlib.sha256(args.content_file.read_bytes()).hexdigest():
+            errors.append("Rendered theme evidence must match the final content.html SHA256")
+        spec = importlib.util.spec_from_file_location(
+            "publisher_rendered_theme", Path(__file__).with_name("verify_theme_rendering.py")
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        rendered_check = module.verify(
+            json.loads(read_text(args.theme_colors_file)), rendered,
+            args.content_file.read_text(encoding="utf-8"),
+        )
+        errors.extend(rendered_check["errors"])
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        errors.append(f"Rendered theme evidence is unavailable or invalid: {exc}")
     css_requirements = [
         (r"\.article-content\s*\{", "Missing scoped .article-content root styles"),
         (
@@ -3559,6 +3557,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--intent-analysis-file", type=Path, required=True)
     parser.add_argument("--site-host", required=True)
     parser.add_argument("--theme-colors-file", type=Path, required=True)
+    parser.add_argument("--rendered-theme-file", type=Path, required=True)
     parser.add_argument("--content-images", type=int, required=True)
     parser.add_argument("--alt-text-file", type=Path, required=True)
     parser.add_argument("--image-reference-file", type=Path, required=True)

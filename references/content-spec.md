@@ -376,87 +376,13 @@ use `informational-close`; omission is correct, not a missing section.
 
 ## Site theme color system
 
-Build a separate theme palette for every site before drafting `content.html`.
-
-1. Inspect the rendered homepage and related product page. Prefer computed styles from stable
-   visible elements such as the header/navigation, primary button, links, headings, normal body
-   copy, borders, and page surface. A loaded same-site stylesheet is acceptable. Use a logo color
-   only when the rendered UI exposes no usable primary accent, and record that fallback.
-2. Record at least one `primary-accent` observation and one `body-text` observation. Normalize
-   `rgb()`, `rgba()`, three-digit hex, or other CSS color forms to uppercase six-digit hex.
-3. Use the confirmed primary accent for links and as the source hue for headings and table
-   accents. Use the confirmed body-text color for article and table body copy. Derive darker
-   variants, borders, and subtle tints only when needed for contrast or table readability.
-4. Require a contrast ratio of at least 4.5:1 for body text against the article surface, muted text
-   against the article surface, links and headings against the article surface, table-header text
-   against the table header, and table body text against striped and hover rows.
-5. Apply all of these variables; font and table color styling must not contain unrelated hard-coded
-   colors:
-
-   - `--article-accent`
-   - `--article-accent-dark`
-   - `--article-text`
-   - `--article-muted`
-   - `--article-border`
-   - `--article-soft`
-   - `--article-surface`
-   - `--article-table-header`
-   - `--article-table-header-text`
-   - `--article-table-stripe`
-   - `--article-table-hover`
-
-Save `<row-run-dir>/theme-colors.json`:
-
-```json
-{
-  "site_host": "www.example.com",
-  "source_urls": [
-    "https://www.example.com/",
-    "https://www.example.com/product/"
-  ],
-  "evidence": [
-    {
-      "url": "https://www.example.com/",
-      "evidence_type": "computed-style",
-      "selector_or_element": "primary header button",
-      "css_property": "background-color",
-      "color": "#176B5B",
-      "role": "primary-accent"
-    },
-    {
-      "url": "https://www.example.com/product/",
-      "evidence_type": "computed-style",
-      "selector_or_element": "product description paragraph",
-      "css_property": "color",
-      "color": "#263238",
-      "role": "body-text"
-    }
-  ],
-  "colors": {
-    "--article-accent": "#176B5B",
-    "--article-accent-dark": "#0F4F44",
-    "--article-text": "#263238",
-    "--article-muted": "#52646C",
-    "--article-border": "#DCE6E3",
-    "--article-soft": "#F4F8F7",
-    "--article-surface": "#FFFFFF",
-    "--article-table-header": "#176B5B",
-    "--article-table-header-text": "#FFFFFF",
-    "--article-table-stripe": "#F4F8F7",
-    "--article-table-hover": "#E8F2EF"
-  },
-  "derivation_notes": "Dark and tint variants preserve the observed site hue while meeting contrast requirements."
-}
-```
-
-Allowed `evidence_type` values are `computed-style`, `stylesheet`, and `logo`. Allowed roles are
-`primary-accent`, `secondary-accent`, `body-text`, `muted-text`, `border`, and `surface`. Every
-evidence URL must be same-site HTTPS. `--article-accent`, `--article-accent-dark`, and
-`--article-table-header` must equal an observed `primary-accent` or be an accessible lighter/darker
-shade that preserves its hue; `--article-text` must equal an observed `body-text`. If any applied
-color is not directly observed, explain its relationship to the observed palette in
-`derivation_notes`. Do not select colors from a product label, third-party widget, advertisement,
-photograph, or competitor site.
+Read [site-theme.md](site-theme.md) before collecting theme evidence or styling an article.
+Build a schema-v2 palette from independently observed brand, heading, body, link and surface roles.
+Preserve the exact brand accent and table fill; adjust text-role selection for contrast rather than
+inventing dark brand shades. Use `scripts/build_theme_palette.py`, keep `token_sources`, and apply
+all twelve output variables. The old `--article-accent-dark` variable is retired for new drafts.
+Require desktop/mobile computed-style evidence before publication and on the public page;
+`verify_theme_rendering.py` detects host CSS overrides that variable-presence checks cannot.
 
 ## Lead, keyword distribution, and internal links
 

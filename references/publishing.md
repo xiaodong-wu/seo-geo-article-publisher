@@ -101,6 +101,17 @@ thumbnail-asset, and listing-page checks as one complete verification attempt. C
 If any part fails, wait 30 seconds and repeat the complete verification once. Do not submit the
 article again while waiting or after the second failure.
 
+A CSS-variable match is not a rendered-theme pass. Also capture the article's computed colors at
+mobile and desktop widths and run `scripts/verify_theme_rendering.py` using
+[site-theme.md](site-theme.md). Require exact role-to-palette matches before writing `已发布`.
+Pass the final `--content-file` so required sample coverage comes from the actual article HTML,
+and pass `--article-url` from the publish result/reconciled manifest. Sample every canonical
+selector and zero-based element index in both viewports; an incomplete sample set, duplicate
+element or another same-site page cannot satisfy this check.
+If host CSS overrides an article role, repeat the complete public check once after 30 seconds,
+including fresh browser samples. If it still fails, mark `待人工检查`; never repost to fix a color.
+Record theme evidence, palette, screenshots and rendered verification paths in the manifest.
+
 ## Sheet result states
 
 - **Verified:** write `已发布`, current Asia/Shanghai time, and the public article URL.

@@ -12,6 +12,8 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 ## Required reading
 
 - Read [references/content-spec.md](references/content-spec.md) before researching or drafting.
+- Read [references/site-theme.md](references/site-theme.md) before collecting colors, styling, or
+  validating rendered article colors.
 - Read [references/publishing.md](references/publishing.md) before reading or updating the Sheet,
   publishing, verifying a page, or handling a partial failure.
 - Read [references/api-contract.md](references/api-contract.md) before calling a site API.
@@ -56,15 +58,14 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      page lists recent articles. Save it as `article_listing_url` in the row manifest for
      post-publish thumbnail verification; do not substitute a generic homepage unless it is the
      site's actual article listing.
-   - Inspect the rendered homepage and related product page for the current site's visual theme.
-     Capture same-site evidence for the primary accent and normal body-text color from computed CSS,
-     a loaded same-site stylesheet, or—in the absence of a usable UI accent—the site's logo. Do not
-     infer the website theme from product packaging or another domain.
-   - Normalize observed colors to six-digit hex and save the evidence plus the complete applied
-     palette in `<row-run-dir>/theme-colors.json` using `references/content-spec.md`. Build a fresh
-     palette for every site tab; never reuse another site's palette unless the recorded evidence
-     independently shows the same colors. Record the palette file, source URLs, and selected colors
-     in the row manifest.
+   - Follow `references/site-theme.md` to inspect the rendered homepage and product/service page.
+     Separate brand accents, secondary CTA colors, native headings, body text, links and surfaces;
+     corroborate the primary accent across two component families on two pages. Exclude previous
+     generated article CSS, third-party widgets and product photography from theme evidence.
+   - Save schema-v2 `theme-evidence.json`, then run `scripts/build_theme_palette.py` to produce
+     `theme-colors.json`. Preserve the exact brand accent and table fill; select readable observed
+     text colors per role instead of darkening the entire brand palette. Keep token-level sources
+     and record both files in the row manifest. Never copy a previous site's muted/border defaults.
    - Infer the user's search purpose primarily from `核心关键字`. Use query modifiers and phrasing
      first; use `目标国家`, `目标客户`, and `相关产品链接` only to disambiguate and deepen the chosen
      intent. Select exactly one primary intent from the seven types in
@@ -286,7 +287,9 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      `.article-content` wrapper, responsive table wrappers, mobile breakpoints, and fixed
      pixel-based font sizes. Pass `theme-colors.json` and require exact agreement between its
      site-specific palette and every CSS color variable, same-site theme evidence, complete
-     theme-variable use for fonts and tables, and passing contrast checks. Also require structured
+     theme-variable use for fonts and tables, and passing contrast checks. Render the final draft
+     at desktop and mobile widths and pass its computed-style evidence as `--rendered-theme-file`;
+     bind that evidence to the final content SHA256. Also require structured
      same-site product-identity evidence, an extracted locked product and mask, auditable raw
      whole-image regeneration, and passing brand, label, packaging, geometry, and side-by-side
      visual checks for every `product-present` image, including the documented
@@ -337,6 +340,10 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
      Treat the complete detail-page, thumbnail-asset, and listing-page result as one verification
      attempt. Check immediately, wait 30 seconds once when needed, and then check the complete
      result again.
+   - Capture desktop/mobile computed styles on the actual public article and run
+     `scripts/verify_theme_rendering.py` as specified in `references/site-theme.md`. Save screenshots
+     and the result; the HTTP/CSS-variable check alone is insufficient. Do not mark published until
+     both public checks pass. A host-style override follows the one-recheck/manual-review rule.
    - Update the Sheet exactly as specified in `references/publishing.md`.
 
 7. **Continue and report**
@@ -368,6 +375,10 @@ python scripts/image_selection.py plan --site-host TAB_HOST \
   --image-reference-file ROW_RUN_DIR/image-references.json
 python scripts/prepare_locked_product.py --source SOURCE_PRODUCT \
   --mask INSPECTED_MASK_PNG --output LOCKED_PRODUCT_PNG --report LOCK_REPORT_JSON
+python scripts/build_theme_palette.py --evidence-file THEME_EVIDENCE_JSON --output THEME_COLORS_JSON
+python scripts/verify_theme_rendering.py --theme-colors-file THEME_COLORS_JSON \
+  --content-file CONTENT_HTML --observations-file RENDERED_THEME_JSON \
+  --output THEME_RENDERING_RESULT_JSON [--article-url PUBLISHED_ARTICLE_URL]
 python scripts/select_title_mode.py --seed "RUN_ID|TAB|ROW_NUMBER|CORE_KEYWORD" \
   --output TITLE_MODE_JSON
 python scripts/optimize_image.py INPUT OUTPUT --kind thumb|content [--fit cover|contain]
@@ -377,7 +388,7 @@ python scripts/validate_article.py --title-file FILE --seo-title-file FILE \
   --title-pattern PATTERN --title-mode-seed TEXT --title-history-file FILE \
   --search-intent INTENT --buyer-stage STAGE --ending-mode MODE \
   --intent-analysis-file FILE --site-host HOST \
-  --theme-colors-file FILE --content-images N --alt-text-file FILE \
+  --theme-colors-file FILE --rendered-theme-file PREPUBLISH_RENDERED_JSON --content-images N --alt-text-file FILE \
   --image-reference-file FILE
 python3 scripts/publish_article.py --site-host TAB_HOST --check-endpoint
 python3 scripts/publish_article.py --site-host TAB_HOST --title-file FILE --seo-title-file FILE \
