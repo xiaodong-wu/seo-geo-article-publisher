@@ -21,6 +21,9 @@ It combines keyword-led search-intent research, title and outline diversity, sit
 - Matches brand accents, headings, body text and links by their observed site roles. Preserves exact brand fills, uses readable text on those fills, and verifies desktop/mobile computed colors before and after publication.
 - Searches all same-site product lists, categories, pagination, and sitemaps for relevant products,
   including synonyms and related product families, and records catalogue coverage.
+- Screens product-specific list metadata before opening details, removes verified repeated sales
+  copy from matching, and preserves ambiguous or sparse entries for further review. Reuses
+  successful responses within the current run while retaining fresh gallery checks.
 - Builds a fresh image inventory from every relevant product gallery before shortlisting sources.
 - Calculates image diversity from 20 recent same-site publication records, tracking original URLs,
   hashes, and product pages, then validates the complete candidate-to-slot assignment.
@@ -55,6 +58,7 @@ It combines keyword-led search-intent research, title and outline diversity, sit
     ├── optimize_image.py
     ├── prepare_locked_product.py
     ├── publish_article.py
+    ├── screen_catalogue.py
     ├── select_title_mode.py
     ├── validate_article.py
     └── verify_article.py

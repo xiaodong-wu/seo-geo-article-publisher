@@ -14,10 +14,8 @@ concluding that usable product context is missing.
    Deduplicate canonical URLs and stop pagination loops when no new products appear. Do not stop
    after the first promising product, supplied category, or first list page.
 3. Search the combined catalogue using the keyword and natural synonyms, alternate product names,
-   ingredients/materials, product family, and intended application. Inspect list titles and
-   descriptions; open matching and ambiguous detail pages to check relevance and original images.
-   Inspect sitemap-only product entries too; open unclear entries rather than treating a URL slug
-   as proof of the product's contents. Unrelated products with clear list metadata need no deep read.
+   ingredients/materials, product family, and intended application. Follow the list screening
+   procedure below before opening product details.
 4. Use the site's own search and focused external `site:` searches to find orphaned pages or resolve
    gaps. Search-engine results supplement catalogue coverage; they do not prove that a product is
    absent. A missing sitemap is not a failure if accessible navigation and lists cover the catalogue.
@@ -33,6 +31,36 @@ product to match the keyword or add unrelated SKUs merely for visual variety. If
 intent can be answered with verified related products and accurately stated limits, continue.
 Fail only when the available evidence still cannot support a truthful article and relevant images.
 
+## Screen product lists before opening details
+
+1. Collect each card's product title and product-specific description, ingredients, form, and
+   application when shown. Merge useful metadata from duplicate cards by canonical URL. Keep the
+   sources that supplied it. Exclude navigation, CTA labels, and repeated site-wide sales copy
+   from `list_text`. For broad service keywords such as private label or OEM, derive specific
+   product families and applications from the search intent and planned article scope. A shared
+   service badge or sales line does not make a product a match.
+2. Screen the combined list once with the run's terms. For a large catalogue, use the bundled
+   helper on a JSON array of deduplicated records with `url`, `title`, and `list_text` fields.
+   Include sitemap-only products even if both metadata fields are empty. Supply `--term` once per
+   keyword or synonym. Supply `--boilerplate` once per verified, repeated template phrase still
+   present in the cards. Pass the complete phrase, never an isolated term such as `private label`.
+   For example, when observed in the current iGuge catalogue, remove `Discuss private label formula
+   and packaging options for your market.` from card text while retaining product titles.
+
+   ```sh
+   python3 /path/to/seo-geo-article-publisher/scripts/screen_catalogue.py catalogue-products.json \
+     --term 'core keyword' --term 'product family' > catalogue-screening.json
+   ```
+
+3. Open `open-detail` entries, the supplied seed detail, and any other candidates surfaced by
+   site search. Review `review-list` entries in groups by family or use case. Skip a detail only
+   when inspected list metadata clearly places the product outside the article's scope. Open
+   plausible synonyms, ambiguous entries, and sitemap-only entries with insufficient metadata.
+   A missing literal match or a URL slug alone cannot establish irrelevance. If no suitable
+   product is confirmed, widen the terms and resolve remaining plausible entries before drawing
+   a conclusion. Reuse successful responses within the current run when verifying details and
+   galleries so the same canonical URL is fetched once for discovery.
+
 ## Evidence
 
 Save `<row-run-dir>/product-discovery.json` and link it from the row manifest. Include:
@@ -42,7 +70,9 @@ Save `<row-run-dir>/product-discovery.json` and link it from the row manifest. I
 - `catalogue_sources`: each root/category/sitemap URL, access result, visited pagination URLs,
   discovered product count, and whether traversal reached its end.
 - `products`: deduplicated discovered detail URLs with titles or other inspected list metadata;
-  record which details were opened and which list/sitemap discovered them.
+  record which details were opened, the reason for opening or skipping each detail, and which
+  list/sitemap discovered them. If the screening helper was used, retain its output alongside
+  `product-discovery.json` and record the final decisions in `products`.
 - `matches`: product URL, verified name, relevance (`exact-product` or `same-product-family`),
   relevance explanation, and `gallery_image_urls` containing every original gallery image URL
   observed on that detail page, including slides, alternate views, and full-resolution links.

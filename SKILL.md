@@ -48,8 +48,9 @@ spreadsheet. Never expose, persist, or repeat a publishing key.
 3. **Research the site**
    - Treat the related product URL as a starting point, not the search boundary. Follow
      [references/product-discovery.md](references/product-discovery.md) to inspect all same-site
-     product lists, categories, pagination, and product sitemaps. Search by the core keyword,
-     synonyms, product family, materials, and use case; open relevant or ambiguous product details.
+     product lists, categories, pagination, and product sitemaps. Screen product-specific list
+     metadata before opening details. Search by the core keyword, synonyms, family, materials, and
+     use case; open relevant or ambiguous details and review their current galleries.
      Save coverage, matches, relevance reasons, and access gaps in `product-discovery.json` before
      concluding that no suitable product or original image exists. Inspect relevant service,
      factory/about, application, and contact pages for supporting context.
